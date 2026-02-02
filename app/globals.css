@@ -1,0 +1,85 @@
+@import "tailwindcss";
+
+/* 1. Tell Tailwind v4 to look for the .dark class */
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  --color-nocturne-dark: #050505;
+  --color-nocturne-purple: #9333ea;
+  --color-nocturne-teal: #2dd4bf;
+}
+
+/* 2. Set the default variables (Light Mode) */
+:root {
+  --background: #ffffff;
+  --foreground: #000000;
+  --card-bg: #f4f4f5; /* zinc-100 */
+  --card-border: #e4e4e7; /* zinc-200 */
+}
+
+/* 3. Override variables when .dark class is present */
+.dark {
+  --background: #050505;
+  --foreground: #ffffff;
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(255, 255, 255, 0.1);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  transition: background-color 0.5s ease, color 0.5s ease;
+}
+@layer base {
+  /* 1. Global Interactive Reset */
+  button, 
+  [role="button"],
+  input[type="submit"],
+  input[type="file"],
+  select,
+  a {
+    cursor: pointer !important;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  /* 2. Tactile "Pressed" Effect for all Buttons */
+  button:active, 
+  .active\:scale-95:active {
+    transform: scale(0.95);
+    transition: transform 0.1s ease;
+  }
+}
+
+@layer utilities {
+  /* 3. Specific Nocturne UI Targets */
+  .cursor-pointer,
+  .group\/stamp,
+  .group\/zoom,
+  .no-scrollbar > div,
+  img[onClick],
+  /* Targets the "CLOSE [X]" and Redact text */
+  [onClick] {
+    cursor: pointer !important;
+  }
+
+  /* Ensure the Country Arrows and Filter Pills react */
+  .flex.gap-4 button,
+  .flex.flex-wrap.gap-2 button {
+    cursor: pointer !important;
+    transition: all 0.2s ease;
+  }
+}
+/* Add this at the very bottom of your globals.css, outside of any @layer if possible */
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none !important;  /* IE and Edge */
+  scrollbar-width: none !important;  /* Firefox */
+  overflow: -moz-scrollbars-none;
+}
