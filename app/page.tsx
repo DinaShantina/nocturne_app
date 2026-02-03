@@ -1,14 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import {
-  useActionState,
-  useEffect,
-  useState,
-  useMemo,
-  startTransition,
-  useRef,
-} from "react";
+import { useActionState, useEffect, useState, useMemo, useRef } from "react";
 import { submitEvent } from "./actions";
 import dynamic from "next/dynamic";
 import Image from "next/image";
