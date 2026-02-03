@@ -1592,7 +1592,7 @@ export default function Home() {
                   {stamps[galleryIndex]?.venue}
                 </h3>
                 <p className="text-white/40 font-mono text-xs uppercase">
-                  {stamps[galleryIndex]?.city} //{" "}
+                  {stamps[galleryIndex]?.city}
                   {stamps[galleryIndex]?.date.replace(/-/g, ".")}
                 </p>
               </div>
