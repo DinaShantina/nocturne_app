@@ -25,7 +25,7 @@ import imageCompression from "browser-image-compression";
 const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
   ssr: false,
   loading: () => (
-    <div className="h-[400px] w-full bg-zinc-900 animate-pulse rounded-2xl flex items-center justify-center font-mono text-xs uppercase text-white/20">
+    <div className="h-100 w-full bg-zinc-900 animate-pulse rounded-2xl flex items-center justify-center font-mono text-xs uppercase text-white/20">
       Booting Map...
     </div>
   ),
@@ -45,13 +45,13 @@ const NocturneCalendar = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const GENRE_COLORS = {
-    TECHNO: "#ff4d4d", // Neon Red
-    HOUSE: "#00f2ff", // Nocturne Teal
-    AMBIENT: "#bc13fe", // Deep Purple
-    RAVE: "#adff2f", // Acid Green
-    INDUSTRIAL: "#555555", // Dark Grey
-  };
+  // const GENRE_COLORS = {
+  //   TECHNO: "#ff4d4d", // Neon Red
+  //   HOUSE: "#00f2ff", // Nocturne Teal
+  //   AMBIENT: "#bc13fe", // Deep Purple
+  //   RAVE: "#adff2f", // Acid Green
+  //   INDUSTRIAL: "#555555", // Dark Grey
+  // };
 
   return (
     <div
@@ -120,7 +120,7 @@ const CATEGORIES = [
   "CONCERT", // Live bands, gigs
 ];
 
-const GENRE_COLORS = {
+const GENRE_COLORS: { [key: string]: string } = {
   RAVE: "#ff4d4d", // Neon Red
   ART: "#bc13fe", // Electric Purple
   JAZZ: "#ffb700", // Amber/Gold
@@ -132,6 +132,7 @@ const GENRE_COLORS = {
 };
 
 export default function Home() {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [state, formAction, isPending] = useActionState(submitEvent, null);
   const [stamps, setStamps] = useState<Stamp[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -317,7 +318,7 @@ export default function Home() {
           lng = result.lng || 0;
         }
       } catch (fetchErr) {
-        console.warn("Geocoding failed");
+        console.warn(fetchErr, "Geocoding failed");
       }
 
       // 4. Save to Firestore (ONLY ONCE, at the bottom after we have the data)
@@ -491,8 +492,6 @@ export default function Home() {
         'input[name="newImage"]',
       ) as HTMLInputElement;
       if (fileInput) fileInput.value = "";
-
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
     } catch (err: any) {
       console.error("Redaction failed:", err);
     }
@@ -572,7 +571,7 @@ export default function Home() {
     <>
       {/* 2. SLIDE-OUT SIDEBAR */}
       <aside
-        className={`fixed left-0 top-0 h-full z-[9999] transition-all duration-500
+        className={`fixed left-0 top-0 h-full z-9999 transition-all duration-500
     /* Adaptive Background & Borders */
     bg-transparent 
     md:bg-purple-100 md:dark:bg-zinc-950 
@@ -588,10 +587,10 @@ export default function Home() {
         {/* PEEK AREA (The floating part on mobile) */}
         {!showSidebar && (
           <div
-            className="absolute right-0 top-0 w-[64px] h-full flex flex-col items-center py-8 gap-6 cursor-pointer hover:bg-white/5 transition-colors"
+            className="absolute right-0 top-0 w-16 h-full flex flex-col items-center py-8 gap-6 cursor-pointer hover:bg-white/5 transition-colors"
             onClick={() => setShowSidebar(true)}
           >
-            <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-teal-500 to-purple-600 p-[2px] shadow-lg">
+            <div className="w-10 h-10 rounded-full bg-linear-to-tr from-teal-500 to-purple-600 p-0.5 shadow-lg">
               <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden">
                 <Image
                   src="/logo.png"
@@ -604,7 +603,7 @@ export default function Home() {
             </div>
 
             {/* Hide the line on mobile to keep it extra clean */}
-            <div className="hidden md:block h-[1px] w-4 bg-white/10" />
+            <div className="hidden md:block h-px w-4 bg-white/10" />
 
             <p className="text-[9px] font-mono text-zinc-400 md:text-zinc-500 [writing-mode:vertical-lr] uppercase tracking-widest drop-shadow-md">
               Dashboard
@@ -709,7 +708,7 @@ export default function Home() {
                     </div>
 
                     {/* Progress Bar Container */}
-                    <div className="h-[2px] w-full bg-white/5 overflow-hidden">
+                    <div className="h-0.5 w-full bg-white/5 overflow-hidden">
                       <div
                         className="h-full transition-all duration-1000 ease-out"
                         style={{
@@ -731,7 +730,7 @@ export default function Home() {
             </div>
 
             {/* New Cultural Rank Badge */}
-            <div className="px-6 py-4 border-y border-white/5 bg-white/[0.02]">
+            <div className="px-6 py-4 border-y border-white/5 bg-white/2">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-[9px] font-mono text-zinc-500 tracking-widest uppercase">
                   Clearance Level
@@ -755,12 +754,12 @@ export default function Home() {
                   {currentRank.name}
                 </h2>
               </div>
-              <div className="mt-2 w-full max-w-[100px]">
+              <div className="mt-2 w-full max-w-25">
                 <div className="flex justify-between text-[7px] font-mono text-zinc-600 mb-1 uppercase">
                   <span>Progress</span>
                   <span>{stamps.length} Stamps</span>
                 </div>
-                <div className="h-[1px] w-full bg-white/5 relative">
+                <div className="h-px w-full bg-white/5 relative">
                   <div
                     className="absolute h-full bg-purple-900/30 dark:bg-white/40 transition-all duration-700"
                     style={{
@@ -822,7 +821,7 @@ export default function Home() {
                   {totalStamps.toString().padStart(2, "0")}
                 </p>
               </div>
-              <div className="w-[1px] h-10 bg-black/10 dark:bg-white/10"></div>
+              <div className="w-px h-10 bg-black/10 dark:bg-white/10"></div>
               <div className="text-center">
                 <p className="text-[9px] font-mono text-black/30 dark:text-white/30 tracking-[0.2em] mb-1">
                   CITIES VISITED
@@ -1066,7 +1065,7 @@ export default function Home() {
                                   Territory Registered
                                 </p>
                                 <span className="w-1 h-1 rounded-full bg-teal-500/40"></span>
-                                <p className="text-[10px] font-mono text-purple-500 dark:text-teal-400 font-bold tracking-[0.1em]">
+                                <p className="text-[10px] font-mono text-purple-500 dark:text-teal-400 font-bold tracking-widest">
                                   {filteredItems.length
                                     .toString()
                                     .padStart(2, "0")}{" "}
@@ -1166,7 +1165,7 @@ export default function Home() {
                         ref={(el) => {
                           scrollRefs.current[country] = el;
                         }}
-                        className="flex overflow-x-auto pt-10 gap-12 pb-12 px-10 no-scrollbar scroll-smooth min-h-[300px]"
+                        className="flex overflow-x-auto pt-10 gap-12 pb-12 px-10 no-scrollbar scroll-smooth min-h-75"
                       >
                         {filteredItems.map((s) => {
                           // 1. Logic for the "Just Issued" badge
@@ -1186,16 +1185,16 @@ export default function Home() {
                                 setIsEditing(false);
                               }}
                               className={`
-                                    flex-none w-[45vw] h-[45vw] max-w-[200px] max-h-[200px]    
+                                    flex-none w-[45vw] h-[45vw] max-w-50 max-h-50    
                                     md:w-64 md:h-64   
                                     group/stamp relative rounded-full flex items-center justify-center cursor-pointer 
                                     transition-all duration-500 hover:scale-110 active:scale-95 shadow-2xl 
-                                    ${isJustIssued ? "z-[100]" : "z-10 hover:z-50"}
+                                    ${isJustIssued ? "z-100" : "z-10 hover:z-50"}
                                   `}
                             >
                               {/* 2. The Badge UI */}
                               {isJustIssued && (
-                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-[100] bg-teal-500 text-black text-[10px] font-black px-4 py-1 rounded-full animate-bounce shadow-[0_0_15px_rgba(45,212,191,0.5)] border-2 border-black whitespace-nowrap">
+                                <div className="absolute -top-4 left-1/2 -translate-x-1/2 z-100 bg-teal-500 text-black text-[10px] font-black px-4 py-1 rounded-full animate-bounce shadow-[0_0_15px_rgba(45,212,191,0.5)] border-2 border-black whitespace-nowrap">
                                   JUST ISSUED
                                 </div>
                               )}
@@ -1204,7 +1203,7 @@ export default function Home() {
                                 className="absolute inset-0 rounded-full border-[3px] md:border-[6px]"
                                 style={{ borderColor: s.color }}
                               ></div>
-                              <div className="absolute inset-[6px] rounded-full overflow-hidden z-0 bg-zinc-500 dark:bg-zinc-950">
+                              <div className="absolute inset-1.5 rounded-full overflow-hidden z-0 bg-zinc-500 dark:bg-zinc-950">
                                 {s.image && (
                                   <Image
                                     src={s.image}
@@ -1243,7 +1242,7 @@ export default function Home() {
 
           {/* MODAL & LIGHTBOX */}
           {selectedStamp && (
-            <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+            <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
               <div className="w-full max-w-lg bg-zinc-900 border border-white/10 rounded-[40px] overflow-hidden shadow-2xl relative">
                 <button
                   onClick={() => setSelectedStamp(null)}
@@ -1308,7 +1307,7 @@ export default function Home() {
                           )}
 
                           {showRedactConfirm && (
-                            <div className="absolute inset-0 z-[60] flex flex-col items-center justify-center bg-red-950/20 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
+                            <div className="absolute inset-0 z-60 flex flex-col items-center justify-center bg-red-950/20 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
                               <p className="text-[10px] font-black text-white tracking-[0.3em] uppercase mb-4 drop-shadow-md">
                                 Confirm Redaction?
                               </p>
@@ -1344,7 +1343,7 @@ export default function Home() {
                           />
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-gradient-to-t from-zinc-900 via-transparent to-transparent pointer-events-none"></div>
+                      <div className="absolute inset-0 bg-linear-to-t from-zinc-900 via-transparent to-transparent pointer-events-none"></div>
                     </div>
                     <div className="p-10 -mt-12 relative z-10">
                       <div className="flex items-center gap-3 mb-4">
@@ -1510,11 +1509,11 @@ export default function Home() {
 
           {/* FULLSCREEN GALLERY LIGHTBOX */}
           {galleryIndex !== null && (
-            <div className="fixed inset-0 z-[300] bg-black/98 backdrop-blur-2xl flex items-center justify-center animate-in fade-in duration-300">
+            <div className="fixed inset-0 z-300 bg-black/98 backdrop-blur-2xl flex items-center justify-center animate-in fade-in duration-300">
               {/* Navigation HUD */}
               <button
                 onClick={() => setGalleryIndex(null)}
-                className="absolute top-10 right-10 z-[310] text-white/40 hover:text-white transition-colors"
+                className="absolute top-10 right-10 z-310 text-white/40 hover:text-white transition-colors"
               >
                 <svg
                   width="32"
@@ -1530,7 +1529,7 @@ export default function Home() {
 
               <button
                 onClick={prevImage}
-                className="absolute left-6 md:left-12 p-4 text-white/20 hover:text-teal-400 transition-all z-[310]"
+                className="absolute left-6 md:left-12 p-4 text-white/20 hover:text-teal-400 transition-all z-310"
               >
                 <svg
                   width="40"
@@ -1545,7 +1544,7 @@ export default function Home() {
               </button>
               <button
                 onClick={nextImage}
-                className="absolute right-6 md:right-12 p-4 text-white/20 hover:text-teal-400 transition-all z-[310]"
+                className="absolute right-6 md:right-12 p-4 text-white/20 hover:text-teal-400 transition-all z-310"
               >
                 <svg
                   width="40"
@@ -1597,7 +1596,7 @@ export default function Home() {
           )}
 
           {showDeleteConfirm && (
-            <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/98 backdrop-blur-md">
+            <div className="fixed inset-0 z-200 flex items-center justify-center bg-black/98 backdrop-blur-md">
               <div className="bg-zinc-900 border border-red-500/20 p-10 rounded-[40px] text-center max-w-xs">
                 <h2 className="text-xl font-black uppercase mb-2">
                   Delete Stamp?
@@ -1627,7 +1626,7 @@ export default function Home() {
             </div>
           )}
 
-          <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-[999]">
+          <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-999">
             <button
               onClick={() => setShowSidebar(!showSidebar)}
               className={`flex items-center gap-2 px-4 py-2 transition-all active:scale-95 rounded-full border
@@ -1680,7 +1679,7 @@ export default function Home() {
       {/* SCROLL TO TOP BUTTON */}
       <button
         onClick={scrollToTop}
-        className={`fixed bottom-8 right-8 z-[80] group flex flex-col items-center gap-2 transition-all duration-500 
+        className={`fixed bottom-8 right-8 z-80 group flex flex-col items-center gap-2 transition-all duration-500 
         ${showScroll ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"}`}
       >
         {/* The Label (Appears on hover) */}
