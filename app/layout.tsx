@@ -14,7 +14,22 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Nocturne Passport",
-  description: "Evidence of travel and experience.",
+  description: "Your digital proof of presence.", // Keep it plain as requested
+  icons: {
+    icon: "/logo.png", // This points to your public/logo.png
+    apple: "/logo.png",
+  },
+  openGraph: {
+    title: "Nocturne Passport",
+    description: "Digital Stamp Collection Protocol",
+    images: [
+      {
+        url: "/logo.png", // This is what shows up in WhatsApp/Discord links
+        width: 800,
+        height: 800,
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
