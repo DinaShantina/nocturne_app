@@ -45,6 +45,21 @@ const NocturneCalendar = ({
 }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const handleContainerClick = () => {
+    // iOS Safari specific: Focus first, then show picker
+    if (inputRef.current) {
+      inputRef.current.focus();
+      if ("showPicker" in HTMLInputElement.prototype) {
+        try {
+          inputRef.current.showPicker();
+        } catch (error) {
+          inputRef.current.click(); // Fallback for older iOS
+        }
+      } else {
+        inputRef.current.click();
+      }
+    }
+  };
   // const GENRE_COLORS = {
   //   TECHNO: "#ff4d4d", // Neon Red
   //   HOUSE: "#00f2ff", // Nocturne Teal
@@ -54,10 +69,7 @@ const NocturneCalendar = ({
   // };
 
   return (
-    <div
-      className="relative w-full group"
-      onClick={() => inputRef.current?.showPicker()} // Programmatically open native picker
-    >
+    <div className="relative w-full group" onClick={handleContainerClick}>
       <div className="bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono cursor-pointer flex justify-between items-center group-hover:border-teal-500 transition-colors">
         <span className={value ? "text-white" : "text-gray-500"}>
           {value ? value.replace(/-/g, ".") : "SELECT DATE"}
@@ -80,7 +92,8 @@ const NocturneCalendar = ({
       <input
         ref={inputRef}
         type="date"
-        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer pointer-events-none"
+        className="absolute inset-0 w-full h-full opacity-0 absolute z-0"
+        style={{ WebkitAppearance: "none" }}
         value={value}
         onChange={(e) => onChange(e.target.value)}
       />
@@ -187,53 +200,75 @@ export default function Home() {
   };
   const detectLocation = () => {
     setIsLocating(true);
+
     if (!navigator.geolocation) {
-      alert("Geolocation is not supported by your browser");
+      alert("Geolocation is not supported");
       setIsLocating(false);
       return;
     }
-    // const normalizedCountry = (countryName: string) => {
-    //   if (!countryName) return "";
-    //   const name = countryName.trim();
-    //   // This merges North Macedonia into your existing Macedonia list
-    //   if (name === "North Macedonia") return "Macedonia";
-    //   return name;
-    // };
-    navigator.geolocation.getCurrentPosition(async (position) => {
-      try {
-        const { latitude, longitude } = position.coords;
-        // Reverse Geocode to get City, Country, and Venue suggestion
-        const res = await fetch(
-          `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
-        );
-        const data = await res.json();
 
-        // Update form values directly using refs or state
-        const form = formRef.current;
-        if (form) {
-          (form.querySelector('input[name="city"]') as HTMLInputElement).value =
-            (data.city || data.locality || "").toUpperCase();
-          // This ensures that even if normalizeCountryName fails, you have a string to work with
-          const rawCountry = data.countryName || "";
-          const normalizedCountry = normalizeCountryName(rawCountry) || "";
+    const options = {
+      enableHighAccuracy: true,
+      timeout: 10000, // 10 seconds
+      maximumAge: 0,
+    };
 
-          (
-            form.querySelector('input[name="country"]') as HTMLInputElement
-          ).value = normalizedCountry.toUpperCase();
-          // Suggest nearest landmark/venue if available
-          if (data.lookupSource === "coordinates" && data.locality) {
-            (
-              form.querySelector('input[name="venue"]') as HTMLInputElement
-            ).placeholder = `SUGGESTION: ${data.locality.toUpperCase()}`;
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          const res = await fetch(
+            `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
+          );
+          const data = await res.json();
+
+          const form = formRef.current;
+          if (form) {
+            const cityInput = form.querySelector(
+              'input[name="city"]',
+            ) as HTMLInputElement;
+            const countryInput = form.querySelector(
+              'input[name="country"]',
+            ) as HTMLInputElement;
+
+            if (cityInput)
+              cityInput.value = (
+                data.city ||
+                data.locality ||
+                ""
+              ).toUpperCase();
+            if (countryInput)
+              countryInput.value = normalizeCountryName(
+                data.countryName || "",
+              ).toUpperCase();
           }
+        } catch (error) {
+          console.error("Geocoding failed:", error);
+        } finally {
+          setIsLocating(false);
         }
-      } catch (error) {
-        console.error("Location error:", error);
-      } finally {
+      },
+      (error) => {
         setIsLocating(false);
-      }
-    });
+        // Helpful error messages for iPhone users
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            alert(
+              "Please enable Location Access in your iPhone Settings for Safari.",
+            );
+            break;
+          case error.POSITION_UNAVAILABLE:
+            alert("Location information is unavailable.");
+            break;
+          case error.TIMEOUT:
+            alert("Location request timed out.");
+            break;
+        }
+      },
+      options,
+    );
   };
+
   useEffect(() => {
     setMounted(true);
     const q = query(collection(db, "stamps"), orderBy("createdAt", "desc"));
@@ -1625,55 +1660,56 @@ export default function Home() {
               </div>
             </div>
           )}
-
-          <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-999">
-            <button
-              onClick={() => setShowSidebar(!showSidebar)}
-              className={`flex items-center gap-2 px-4 py-2 transition-all active:scale-95 rounded-full border
+          {!selectedStamp && !isEditing && (
+            <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-999">
+              <button
+                onClick={() => setShowSidebar(!showSidebar)}
+                className={`flex items-center gap-2 px-4 py-2 transition-all active:scale-95 rounded-full border
                 /* Adaptive Colors */
                 bg-purple-200/50 dark:bg-zinc-900 
                 border-purple-300/50 dark:border-white/10 
                 hover:border-purple-500 dark:hover:border-teal-500`}
-            >
-              <svg
-                width="16"
-                height="16"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2.5"
-                className="text-purple-600 dark:text-teal-500"
               >
-                {/* Dynamic icon change: X when open, Burger when closed */}
-                {showSidebar ? (
-                  <path d="M18 6L6 18M6 6l12 12" />
-                ) : (
-                  <path d="M3 12h18M3 6h18M3 18h18" />
-                )}
-              </svg>
-              <span className="text-[10px] font-black uppercase italic tracking-widest text-purple-950 dark:text-white">
-                {showSidebar ? "Close" : "Dashboard"}
-              </span>
-            </button>
-            <button
-              onClick={() => setView("passport")}
-              className={`text-[10px] font-black tracking-widest transition-all ${view === "passport" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
-            >
-              PASSPORT
-            </button>
-            <button
-              onClick={() => {
-                setView("map");
-                // This scrolls the window down so the map is centered
-                setTimeout(() => {
-                  window.scrollTo({ top: 600, behavior: "smooth" });
-                }, 100);
-              }}
-              className={`text-[10px] font-black tracking-widest transition-all ${view === "map" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
-            >
-              GLOBAL MAP
-            </button>
-          </nav>
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  className="text-purple-600 dark:text-teal-500"
+                >
+                  {/* Dynamic icon change: X when open, Burger when closed */}
+                  {showSidebar ? (
+                    <path d="M18 6L6 18M6 6l12 12" />
+                  ) : (
+                    <path d="M3 12h18M3 6h18M3 18h18" />
+                  )}
+                </svg>
+                <span className="text-[10px] font-black uppercase italic tracking-widest text-purple-950 dark:text-white">
+                  {showSidebar ? "Close" : "Dashboard"}
+                </span>
+              </button>
+              <button
+                onClick={() => setView("passport")}
+                className={`text-[10px] font-black tracking-widest transition-all ${view === "passport" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
+              >
+                PASSPORT
+              </button>
+              <button
+                onClick={() => {
+                  setView("map");
+                  // This scrolls the window down so the map is centered
+                  setTimeout(() => {
+                    window.scrollTo({ top: 600, behavior: "smooth" });
+                  }, 100);
+                }}
+                className={`text-[10px] font-black tracking-widest transition-all ${view === "map" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
+              >
+                GLOBAL MAP
+              </button>
+            </nav>
+          )}
         </div>
       </main>
       {/* SCROLL TO TOP BUTTON */}
