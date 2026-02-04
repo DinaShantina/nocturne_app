@@ -22,7 +22,7 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import imageCompression from "browser-image-compression";
-import { normalizeCountryName } from "@/lib/utils";
+import { normalizeCountryName, getValidCoordinates } from "@/lib/utils";
 
 const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
   ssr: false,
@@ -34,6 +34,10 @@ const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
 });
 
 const ThemeToggle = dynamic(() => import("./components/ThemeToggle"), {
+  ssr: false,
+});
+
+const LocationPicker = dynamic(() => import("./components/LocationPicker"), {
   ssr: false,
 });
 
@@ -62,13 +66,6 @@ const NocturneCalendar = ({
       }
     }
   };
-  // const GENRE_COLORS = {
-  //   TECHNO: "#ff4d4d", // Neon Red
-  //   HOUSE: "#00f2ff", // Nocturne Teal
-  //   AMBIENT: "#bc13fe", // Deep Purple
-  //   RAVE: "#adff2f", // Acid Green
-  //   INDUSTRIAL: "#555555", // Dark Grey
-  // };
 
   return (
     <div className="relative w-full group" onClick={handleContainerClick}>
@@ -187,6 +184,10 @@ export default function Home() {
   } | null>(null);
   const [isDnaOpen, setIsDnaOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
+  const [tempCoords, setTempCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   const totalDistance = useMemo(() => {
     if (!stamps || stamps.length === 0) return 0;
@@ -235,6 +236,7 @@ export default function Home() {
 
           const form = formRef.current;
           const cleanCountry = normalizeCountryName(data.countryName || "");
+
           if (form) {
             const cityInput = form.querySelector(
               'input[name="city"]',
@@ -308,20 +310,6 @@ export default function Home() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
-  const normalizeCountryName = (countryName: any) => {
-    // If countryName is null, undefined, or not a string, return empty string
-    if (!countryName || typeof countryName !== "string") return "";
-
-    const name = countryName.trim();
-
-    // Logic for merging the regions
-    if (name === "North Macedonia") {
-      return "Macedonia";
-    }
-
-    return name;
-  };
-
   // --- Stats Logic ---
   const totalStamps = stamps.length;
   const uniqueCities = useMemo(
@@ -334,52 +322,64 @@ export default function Home() {
     const formElement = e.currentTarget;
     const formData = new FormData(formElement);
 
-    // 1. Prepare variables first
+    // 1. Prepare variables
     let imageUrl = "";
     let lat = 0;
     let lng = 0;
     const file = formData.get("image") as File;
 
-    // Normalize the country right away
     const rawCountry = (formData.get("country") as string) || "";
     const finalCountry = normalizeCountryName(rawCountry).toUpperCase();
+    const rawCity = ((formData.get("city") as string) || "").toUpperCase();
 
     try {
-      // 2. Upload Image
+      // 2. Upload Image (With Safety Catch)
       if (file && file.name && file.size > 0) {
-        const options = {
-          maxSizeMB: 0.8,
-          maxWidthOrHeight: 1200,
-          useWebWorker: true,
-        };
-        const compressedFile = await imageCompression(file, options);
-        const storageRef = ref(storage, `stamps/${Date.now()}_${file.name}`);
-        const uploadResult = await uploadBytes(storageRef, compressedFile);
-        imageUrl = await getDownloadURL(uploadResult.ref);
+        try {
+          const options = {
+            maxSizeMB: 0.8,
+            maxWidthOrHeight: 1200,
+            useWebWorker: true,
+          };
+          const compressedFile = await imageCompression(file, options);
+          const storageRef = ref(storage, `stamps/${Date.now()}_${file.name}`);
+          const uploadResult = await uploadBytes(storageRef, compressedFile);
+          imageUrl = await getDownloadURL(uploadResult.ref);
+        } catch (imgErr) {
+          console.warn("Image upload failed, continuing without image", imgErr);
+          // We don't stop the whole process if just the image fails
+        }
       }
 
-      // 3. Get Coordinates (Geocoding)
-      // 3. Get Coordinates (Geocoding)
-      try {
-        if (detectedCoords) {
-          // Use the GPS coords we saved earlier (Fixes iPhone GPS issue)
-          lat = detectedCoords.lat;
-          lng = detectedCoords.lng;
-        } else {
-          // Fallback: Try server-side geocoding for manual typing
+      // 3. Coordinate Logic with City Fallback
+      if (detectedCoords) {
+        lat = detectedCoords.lat;
+        lng = detectedCoords.lng;
+      } else {
+        // Try geocoding
+        try {
           const result = await submitEvent(null, formData);
           if (result?.success) {
             lat = result.lat || 0;
             lng = result.lng || 0;
           }
+        } catch (geoErr) {
+          console.warn("Geocoding failed");
         }
-      } catch (fetchErr) {
-        console.warn(fetchErr, "Geocoding failed");
       }
 
-      // 4. Save to Firestore (ONLY ONCE, at the bottom after we have the data)
+      // NEW: If we still have 0,0, try the hardcoded city fallback from utils
+      if (lat === 0 && lng === 0) {
+        const [fallbackLng, fallbackLat] = getValidCoordinates({
+          city: rawCity,
+        });
+        lat = fallbackLat;
+        lng = fallbackLng;
+      }
+
+      // 4. Save to Firestore
       const docRef = await addDoc(collection(db, "stamps"), {
-        city: ((formData.get("city") as string) || "").toUpperCase(),
+        city: rawCity,
         country: finalCountry,
         venue: ((formData.get("venue") as string) || "").toUpperCase(),
         activity: (formData.get("activity") as string) || "",
@@ -395,40 +395,33 @@ export default function Home() {
         createdAt: serverTimestamp(),
       });
 
-      // 5. Success Logic
-      const newStamp = {
-        id: docRef.id,
-        venue: formData.get("venue"),
-        createdAt: Date.now(),
-      };
-
+      // 5. Reset & Success
       formElement.reset();
       setImageUploaded(false);
       setCreateDate(new Date().toISOString().split("T")[0]);
       setShowForm(false);
       setDetectedCoords(null);
       setShowSuccess(true);
-      setTimeout(() => setShowSuccess(false), 3000); // Hide after 3 seconds
-      setTimeout(() => {
-        const element = document.getElementById(`stamp-${newStamp.id}`);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }, 500);
 
-      return newStamp;
-    } catch (error: unknown) {
-      console.error("Stamp creation failed:", error);
+      setTimeout(() => setShowSuccess(false), 3000);
+      setTimeout(() => {
+        const element = document.getElementById(`stamp-${docRef.id}`);
+        if (element)
+          element.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 500);
+    } catch (error: any) {
+      console.error("Critical Failure:", error);
+      alert("System Error: " + (error.message || "Unknown Error"));
     }
   };
-
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedStamp) return;
 
     // 1. Define 'f' FIRST so you can use it
     const f = new FormData(e.currentTarget);
-
+    const manualLat = parseFloat(f.get("lat") as string);
+    const manualLng = parseFloat(f.get("lng") as string);
     // 2. Now you can safely normalize the country
     const rawCountry = String(f.get("country") || "");
     const finalCountry = normalizeCountryName(rawCountry).toUpperCase();
@@ -458,11 +451,14 @@ export default function Home() {
         category: String(f.get("category")),
         date: editDate || selectedStamp.date,
         image: imageUrl,
+        lat: manualLat,
+        lng: manualLng,
       });
 
       setIsEditing(false);
       setSelectedStamp(null);
       setEditImageUploaded(false);
+      setTempCoords(null);
     } catch (err: any) {
       alert(`Update failed: ${err.message}`);
     }
@@ -630,36 +626,38 @@ export default function Home() {
 
       const updates = snapshot.docs.map(async (docSnap) => {
         const data = docSnap.data();
-        const rawCountry = (data.country || "").toString().toUpperCase().trim();
+        // Store the current name so we can compare and log it
+        const currentCountryName = (data.country || "").toString();
 
-        let cleanName = rawCountry;
+        // Use your helper to get the "Clean" version
+        const cleanName =
+          normalizeCountryName(currentCountryName).toUpperCase();
 
-        // DIRECT LOGIC BYPASS
-        if (rawCountry.includes("NETHERLANDS")) {
-          cleanName = "NETHERLANDS";
-        } else if (rawCountry.includes("MACEDONIA")) {
-          cleanName = "MACEDONIA";
-        }
-
-        if (cleanName !== rawCountry) {
+        // Only update if the name is actually different
+        if (cleanName !== currentCountryName.toUpperCase()) {
           updateCount++;
+
           console.log(
-            `%c UPDATING DOC ${docSnap.id}: ${rawCountry} -> ${cleanName}`,
+            `%c UPDATING DOC ${docSnap.id}: ${currentCountryName} -> ${cleanName}`,
             "color: #2dd4bf; font-weight: bold;",
           );
+
           return updateDoc(doc(db, "stamps", docSnap.id), {
             country: cleanName,
           });
         }
+
+        return Promise.resolve(); // No update needed for this stamp
       });
 
       await Promise.all(updates);
       alert(`Successfully cleaned ${updateCount} stamps!`);
-      window.location.reload(); // Refresh the map
+      window.location.reload();
     } catch (err) {
       console.error("Cleanup Error:", err);
     }
   };
+
   if (!mounted) return null;
 
   return (
@@ -1442,7 +1440,10 @@ export default function Home() {
             <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
               <div className="w-full max-w-lg bg-zinc-900 border border-white/10 rounded-[40px] overflow-hidden shadow-2xl relative">
                 <button
-                  onClick={() => setSelectedStamp(null)}
+                  onClick={() => {
+                    setIsEditing(false);
+                    setSelectedStamp(null); // This is what triggers the Nav tabs to return
+                  }}
                   className="absolute top-6 right-6 z-50 text-white/40 hover:text-white transition-colors"
                 >
                   <svg
@@ -1608,6 +1609,38 @@ export default function Home() {
                           className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
                         />
                       </div>
+                      <div className="flex flex-col gap-2 mt-4">
+                        <label className="text-[10px] text-zinc-500 font-mono text-left uppercase">
+                          📍 Click map to pin location
+                        </label>
+                        <LocationPicker
+                          initialPos={[
+                            selectedStamp?.lat || 0,
+                            selectedStamp?.lng || 0,
+                          ]}
+                          onLocationSelect={(lat, lng) =>
+                            setTempCoords({ lat, lng })
+                          }
+                        />
+                        {tempCoords && (
+                          <p className="text-[9px] text-teal-500 font-mono mt-1">
+                            NEW COORDS: {tempCoords.lat.toFixed(4)},{" "}
+                            {tempCoords.lng.toFixed(4)}
+                          </p>
+                        )}
+                        {/* Hidden inputs to make sure the coordinates get sent with the form */}
+                        <input
+                          type="hidden"
+                          name="lat"
+                          value={tempCoords?.lat || selectedStamp?.lat || 0}
+                        />
+                        <input
+                          type="hidden"
+                          name="lng"
+                          value={tempCoords?.lng || selectedStamp?.lng || 0}
+                        />
+                      </div>
+
                       <input
                         name="venue"
                         defaultValue={selectedStamp.venue}
@@ -1692,7 +1725,10 @@ export default function Home() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setIsEditing(false)}
+                          onClick={() => {
+                            setIsEditing(false);
+                            setSelectedStamp(null);
+                          }}
                           className="flex-1 py-4 text-[10px] font-black uppercase border border-white/10 rounded-2xl hover:bg-white/5 transition-colors text-white/40"
                         >
                           Back
@@ -1824,7 +1860,7 @@ export default function Home() {
             </div>
           )}
           {!selectedStamp && !isEditing && (
-            <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-999">
+            <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-[9999] animate-in fade-in slide-in-from-bottom-4 duration-300">
               <button
                 onClick={() => setShowSidebar(!showSidebar)}
                 className={`flex items-center gap-2 px-4 py-2 transition-all active:scale-95 rounded-full border
