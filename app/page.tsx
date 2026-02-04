@@ -18,9 +18,11 @@ import {
   deleteDoc,
   updateDoc,
   serverTimestamp,
+  getDocs,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import imageCompression from "browser-image-compression";
+import { normalizeCountryName } from "@/lib/utils";
 
 const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
   ssr: false,
@@ -179,6 +181,12 @@ export default function Home() {
   );
   const [showSidebar, setShowSidebar] = useState(false);
   const [showScroll, setShowScroll] = useState(false);
+  const [detectedCoords, setDetectedCoords] = useState<{
+    lat: number;
+    lng: number;
+  } | null>(null);
+  const [isDnaOpen, setIsDnaOpen] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const totalDistance = useMemo(() => {
     if (!stamps || stamps.length === 0) return 0;
@@ -215,14 +223,18 @@ export default function Home() {
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
+        const { latitude, longitude } = position.coords;
+
+        // 1. SAVE RAW COORDS IMMEDIATELY
+        setDetectedCoords({ lat: latitude, lng: longitude });
         try {
-          const { latitude, longitude } = position.coords;
           const res = await fetch(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
           );
           const data = await res.json();
 
           const form = formRef.current;
+          const cleanCountry = normalizeCountryName(data.countryName || "");
           if (form) {
             const cityInput = form.querySelector(
               'input[name="city"]',
@@ -237,10 +249,11 @@ export default function Home() {
                 data.locality ||
                 ""
               ).toUpperCase();
-            if (countryInput)
+            if (countryInput) {
               countryInput.value = normalizeCountryName(
                 data.countryName || "",
               ).toUpperCase();
+            }
           }
         } catch (error) {
           console.error("Geocoding failed:", error);
@@ -346,11 +359,19 @@ export default function Home() {
       }
 
       // 3. Get Coordinates (Geocoding)
+      // 3. Get Coordinates (Geocoding)
       try {
-        const result = await submitEvent(null, formData);
-        if (result?.success) {
-          lat = result.lat || 0;
-          lng = result.lng || 0;
+        if (detectedCoords) {
+          // Use the GPS coords we saved earlier (Fixes iPhone GPS issue)
+          lat = detectedCoords.lat;
+          lng = detectedCoords.lng;
+        } else {
+          // Fallback: Try server-side geocoding for manual typing
+          const result = await submitEvent(null, formData);
+          if (result?.success) {
+            lat = result.lat || 0;
+            lng = result.lng || 0;
+          }
         }
       } catch (fetchErr) {
         console.warn(fetchErr, "Geocoding failed");
@@ -385,7 +406,9 @@ export default function Home() {
       setImageUploaded(false);
       setCreateDate(new Date().toISOString().split("T")[0]);
       setShowForm(false);
-
+      setDetectedCoords(null);
+      setShowSuccess(true);
+      setTimeout(() => setShowSuccess(false), 3000); // Hide after 3 seconds
       setTimeout(() => {
         const element = document.getElementById(`stamp-${newStamp.id}`);
         if (element) {
@@ -600,24 +623,60 @@ export default function Home() {
 
   const rank = getRankData(stamps.length);
 
+  const cleanExistingData = async () => {
+    try {
+      const snapshot = await getDocs(collection(db, "stamps"));
+      let updateCount = 0;
+
+      const updates = snapshot.docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        const rawCountry = (data.country || "").toString().toUpperCase().trim();
+
+        let cleanName = rawCountry;
+
+        // DIRECT LOGIC BYPASS
+        if (rawCountry.includes("NETHERLANDS")) {
+          cleanName = "NETHERLANDS";
+        } else if (rawCountry.includes("MACEDONIA")) {
+          cleanName = "MACEDONIA";
+        }
+
+        if (cleanName !== rawCountry) {
+          updateCount++;
+          console.log(
+            `%c UPDATING DOC ${docSnap.id}: ${rawCountry} -> ${cleanName}`,
+            "color: #2dd4bf; font-weight: bold;",
+          );
+          return updateDoc(doc(db, "stamps", docSnap.id), {
+            country: cleanName,
+          });
+        }
+      });
+
+      await Promise.all(updates);
+      alert(`Successfully cleaned ${updateCount} stamps!`);
+      window.location.reload(); // Refresh the map
+    } catch (err) {
+      console.error("Cleanup Error:", err);
+    }
+  };
   if (!mounted) return null;
 
   return (
-    <>
-      {/* 2. SLIDE-OUT SIDEBAR */}
+    <div className="flex min-h-screen bg-zinc-950">
+      {/* SLIDE-OUT SIDEBAR */}
       <aside
         className={`fixed left-0 top-0 h-full z-9999 transition-all duration-500
-    /* Adaptive Background & Borders */
-    bg-transparent 
-    md:bg-purple-100 md:dark:bg-zinc-950 
-    md:border-r border-purple-300/50 dark:border-white/10
-    
-    ${galleryIndex !== null ? "-translate-x-full" : ""} 
-    ${
-      showSidebar
-        ? "w-80 translate-x-0 bg-purple-100 dark:bg-zinc-950 shadow-2xl md:shadow-none"
-        : "w-80 -translate-x-[calc(100%-64px)]"
-    }`}
+          /* Adaptive Background & Borders */
+          bg-transparent 
+          md:bg-purple-100 md:dark:bg-zinc-950 
+          md:border-r border-purple-300/50 dark:border-white/10
+          ${galleryIndex !== null ? "-translate-x-full" : ""} 
+          ${
+            showSidebar
+              ? "w-80 translate-x-0 bg-purple-100 dark:bg-zinc-950 shadow-2xl md:shadow-none"
+              : "w-80 -translate-x-[calc(100%-64px)]"
+          }`}
       >
         {/* PEEK AREA (The floating part on mobile) */}
         {!showSidebar && (
@@ -648,7 +707,7 @@ export default function Home() {
 
         {/* FULL CONTENT (Visible when open) */}
         <div
-          className={`flex-1 flex flex-col p-8 transition-opacity duration-300 ${showSidebar ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+          className={`flex-1 flex flex-col p-8 overflow-y-auto h-full custom-scrollbar transition-opacity duration-300 ${showSidebar ? "opacity-100" : "opacity-0 pointer-events-none"}`}
         >
           {/* Profile Header */}
           <div className="flex justify-between items-start mb-12">
@@ -689,12 +748,41 @@ export default function Home() {
           </div>
 
           {/* STATS GRID */}
-          <div className="space-y-12">
+          <div className="space-y-6 mt-4">
             {/* Primary Stat */}
-            <div className="space-y-2">
-              <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
-                Lifetime Exploration
-              </p>
+            <div className="space-y-1">
+              <div className="flex items-center gap-1.5 group relative">
+                <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                  Lifetime Exploration
+                </p>
+
+                {/* Info Icon */}
+                <div className="cursor-help text-zinc-600 hover:text-purple-500 dark:hover:text-teal-400 transition-colors">
+                  <svg
+                    width="10"
+                    height="10"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="3"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  >
+                    <circle cx="12" cy="12" r="10" />
+                    <line x1="12" y1="16" x2="12" y2="12" />
+                    <line x1="12" y1="8" x2="12.01" y2="8" />
+                  </svg>
+                </div>
+
+                {/* Tooltip Badge */}
+                <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-white dark:bg-zinc-950 border border-purple-100 dark:border-white/10 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-50 transform translate-y-1 group-hover:translate-y-0">
+                  <p className="text-[9px] leading-tight text-purple-900 dark:text-zinc-400 font-mono italic">
+                    The cumulative distance between all your stamps, calculated
+                    via GPS coordinates for your entire journey.
+                  </p>
+                </div>
+              </div>
+
               <div className="flex items-baseline gap-2 mt-1">
                 <h3 className="text-3xl md:text-3xl font-black italic uppercase tracking-tighter text-purple-950 dark:text-white leading-none">
                   {totalDistance.toLocaleString()}
@@ -706,7 +794,7 @@ export default function Home() {
             </div>
 
             {/* Secondary Stats */}
-            <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-6 -mt-2.5">
+            <div className="grid grid-cols-2 gap-4 border-t border-white/5 pt-4">
               <div className="space-y-1">
                 <p className="text-[8px] font-mono text-zinc-500 uppercase tracking-[0.2em]">
                   Stamps
@@ -725,52 +813,84 @@ export default function Home() {
               </div>
             </div>
 
-            <div className="px-6 py-8 space-y-6 -mt-4">
-              <h3 className="text-[10px] font-mono text-zinc-500 tracking-[0.3em] uppercase">
-                Cultural DNA
-              </h3>
+            {/* 3. CULTURAL DNA (New Compact Version) */}
+            <div className="border-t border-purple-300/20 dark:border-white/5 pt-4 mt-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setIsDnaOpen(!isDnaOpen);
+                }}
+                className="flex items-center justify-between w-full group py-2"
+              >
+                <h3 className="text-[9px] font-mono text-zinc-500 tracking-[0.3em] uppercase group-hover:text-zinc-300 transition-colors">
+                  Cultural DNA
+                </h3>
+                <svg
+                  width="10"
+                  height="10"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  className={`text-zinc-500 transition-transform duration-300 ${isDnaOpen ? "rotate-180" : ""}`}
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
 
-              <div className="space-y-4">
-                {stats.map((stat) => (
-                  <div key={stat.label} className="group">
-                    <div className="flex justify-between items-end mb-2">
-                      <span className="text-[10px] font-mono text-purple-900/60 dark:text-white/70 uppercase">
-                        {stat.label}
-                      </span>
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        {Math.round(stat.percentage)}%
-                      </span>
+              {isDnaOpen && (
+                <div className="space-y-3 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
+                  {stats.map((stat) => (
+                    <div key={stat.label} className="group">
+                      <div className="flex justify-between items-end mb-1">
+                        <span className="text-[9px] font-mono text-purple-900/60 dark:text-white/70 uppercase">
+                          {stat.label}
+                        </span>
+                        <span className="text-[9px] font-mono text-zinc-500">
+                          {Math.round(stat.percentage)}%
+                        </span>
+                      </div>
+                      <div className="h-0.5 w-full bg-white/5 overflow-hidden">
+                        <div
+                          className="h-full transition-all duration-1000 ease-out"
+                          style={{
+                            width: `${stat.percentage}%`,
+                            backgroundColor: stat.color,
+                            boxShadow: `0 0 8px ${stat.color}`,
+                          }}
+                        />
+                      </div>
                     </div>
+                  ))}
+                </div>
+              )}
+            </div>
 
-                    {/* Progress Bar Container */}
-                    <div className="h-0.5 w-full bg-white/5 overflow-hidden">
-                      <div
-                        className="h-full transition-all duration-1000 ease-out"
-                        style={{
-                          width: `${stat.percentage}%`,
-                          backgroundColor: stat.color,
-                          boxShadow: `0 0 8px ${stat.color}`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-
-                {stamps.length === 0 && (
-                  <p className="text-[10px] font-mono text-zinc-600 italic">
-                    Awaiting data input...
-                  </p>
-                )}
+            {/* 4. TOTAL STEPS (Moved closer) */}
+            <div className="border-t border-purple-300/20 dark:border-white/5 pt-4 mt-4">
+              <p className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                Total Steps
+              </p>
+              <div className="flex items-baseline gap-2 mt-1">
+                <h3 className="text-2xl font-black italic uppercase text-purple-950 dark:text-white leading-none">
+                  0
+                </h3>
+                <span className="text-[9px] font-mono text-zinc-600 tracking-tighter uppercase">
+                  Steps
+                </span>
               </div>
+              <p className="text-[7px] font-mono text-zinc-500/60 uppercase italic mt-1">
+                * Biometric Integration Pending
+              </p>
             </div>
 
             {/* New Cultural Rank Badge */}
             <div className="px-6 py-4 border-y border-white/5 bg-white/2">
               <div className="flex items-center justify-between mb-1">
-                <span className="text-[9px] font-mono text-zinc-500 tracking-widest uppercase">
+                <span className="text-[8px] font-mono text-zinc-500 tracking-widest uppercase">
                   Clearance Level
                 </span>
-                <span className="text-[9px] font-mono text-purple-800/50 dark:text-zinc-500">
+                <span className="text-[8px] font-mono text-purple-800/50 dark:text-zinc-500">
                   {currentRank.level}
                 </span>
               </div>
@@ -805,10 +925,52 @@ export default function Home() {
                 </div>
               </div>
             </div>
+            <div className="mt-4 pt-4 border-t border-white/5">
+              <button
+                onClick={cleanExistingData}
+                className="w-full py-1.5 border border-red-500/20 text-red-500/40 text-[7px] font-mono rounded hover:bg-red-500/5 transition-colors uppercase tracking-[0.2em]"
+              >
+                Fix Database
+              </button>
+              <p className="text-[6px] font-mono text-red-500/30 uppercase italic mt-1 text-center">
+                * ADMIN OVERRIDE ONLY
+              </p>
+            </div>
           </div>
         </div>
       </aside>
-      <main className="min-h-screen bg-white dark:bg-black text-black dark:text-white transition-colors duration-500 flex flex-col items-center w-full">
+      <main
+        className={`min-h-screen bg-white dark:bg-black text-black dark:text-white transition-all duration-500 flex flex-col items-center w-full 
+          ${showSidebar ? "md:pl-80" : "md:pl-16"}`}
+      >
+        {showSuccess && (
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[90%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-500">
+            <div className="bg-zinc-900/90 backdrop-blur-xl border border-teal-500/30 p-4 rounded-2xl shadow-2xl flex items-center gap-4">
+              {/* Animated Checkmark */}
+              <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center border border-teal-500/40">
+                <svg
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="#2dd4bf"
+                  strokeWidth="3"
+                >
+                  <polyline points="20 6 9 17 4 12" />
+                </svg>
+              </div>
+
+              <div>
+                <h4 className="text-[10px] font-mono text-teal-400 uppercase tracking-widest font-bold">
+                  Stamp Issued
+                </h4>
+                <p className="text-[9px] font-mono text-zinc-400 uppercase italic">
+                  Cultural DNA Synchronized
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
         {/* Full width container to handle background colors properly */}
         <div className="w-full flex flex-col items-center px-4">
           <header className="flex flex-col items-center mb-8 mt-16 w-full max-w-4xl relative">
@@ -1421,7 +1583,6 @@ export default function Home() {
                   </div>
                 ) : (
                   <div className="p-10 pt-16">
-                    {" "}
                     {/* Increased padding for the close button */}
                     <h2 className="text-xl font-black uppercase tracking-widest mb-8 text-teal-400 italic">
                       Modify Log
@@ -1429,7 +1590,7 @@ export default function Home() {
                     <form
                       ref={editFormRef}
                       onSubmit={handleUpdate}
-                      className="space-y-4"
+                      className="w-full max-w-md space-y-4 mx-auto relative z-10 p-8 rounded-[2.5rem] bg-purple-50/50 border-purple-200 shadow-[0_20px_50px_rgba(147,51,234,0.1)] dark:bg-white/3 dark:border-white/10 dark:shadow-none transition-all duration-500 border"
                     >
                       <div className="grid grid-cols-2 gap-4">
                         <input
@@ -1437,14 +1598,14 @@ export default function Home() {
                           defaultValue={selectedStamp.city}
                           placeholder="CITY"
                           required
-                          className="bg-black border border-white/10 rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none focus:border-teal-500"
+                          className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
                         />
                         <input
                           name="country"
                           defaultValue={selectedStamp.country}
                           placeholder="COUNTRY"
                           required
-                          className="bg-black border border-white/10 rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none focus:border-teal-500"
+                          className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
                         />
                       </div>
                       <input
@@ -1452,17 +1613,14 @@ export default function Home() {
                         defaultValue={selectedStamp.venue}
                         placeholder="VENUE"
                         required
-                        className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none focus:border-teal-500"
+                        className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
                       />
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-2">
-                          <label className="text-[10px] font-mono text-zinc-500 tracking-[0.2em] uppercase">
-                            Event Signature
-                          </label>
                           <select
                             name="category"
                             defaultValue={selectedStamp.category}
-                            className="bg-black border border-white/10 rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none focus:border-teal-500 transition-colors cursor-pointer"
+                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all bg-white border-purple-200 text-purple-900 dark:bg-black/60 dark:border-white/10 dark:text-white"
                           >
                             <option value="">UNCATEGORIZED</option>
                             {CATEGORIES.map((c) => (
@@ -1482,7 +1640,7 @@ export default function Home() {
                         defaultValue={selectedStamp.activity}
                         rows={3}
                         placeholder="ACTIVITY"
-                        className="w-full bg-black border border-white/10 rounded-xl px-4 py-3 text-xs font-mono outline-none focus:border-teal-500"
+                        className="w-full rounded-xl px-4 py-3 text-xs font-mono outline-none border transition-all bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
                       />
 
                       <div className="relative">
@@ -1496,7 +1654,12 @@ export default function Home() {
                           className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                         />
                         <div
-                          className={`w-full bg-black/40 border border-dashed rounded-xl py-4 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase ${editImageUploaded ? "border-teal-500 text-teal-500" : "border-white/10 text-gray-500"}`}
+                          className={`w-full border border-dashed rounded-xl py-4 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase transition-all
+                          ${
+                            editImageUploaded
+                              ? "border-purple-500 text-purple-600 bg-purple-50 dark:border-teal-500 dark:text-teal-500 dark:bg-transparent"
+                              : "border-purple-200 text-purple-300 bg-white dark:border-white/10 dark:text-white dark:bg-black/40"
+                          }`}
                         >
                           {editImageUploaded
                             ? "New Evidence Ready"
@@ -1523,7 +1686,7 @@ export default function Home() {
                         </button>
                         <button
                           type="submit"
-                          className="flex-1 py-4 text-[10px] font-black uppercase bg-white text-black rounded-2xl hover:bg-teal-400 transition-colors shadow-lg"
+                          className="flex-1 py-4 text-[10px] font-black uppercase border rounded-2xl transition-all border-purple-200 text-purple-400 hover:bg-purple-50 dark:border-white/10 dark:text-white/40 dark:hover:bg-white/5"
                         >
                           Save Update
                         </button>
@@ -1738,6 +1901,6 @@ export default function Home() {
           </svg>
         </div>
       </button>
-    </>
+    </div>
   );
 }
