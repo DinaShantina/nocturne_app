@@ -188,6 +188,8 @@ export default function Home() {
     lat: number;
     lng: number;
   } | null>(null);
+  const [isIssuing, setIsIssuing] = useState(false);
+  const [status, setStatus] = useState(""); // To show "Uploading..." etc.
 
   const totalDistance = useMemo(() => {
     if (!stamps || stamps.length === 0) return 0;
@@ -494,12 +496,24 @@ export default function Home() {
     } else {
       // Recent: Look at the newest stamp in each country and sort countries by that
       sortedCountryNames = Object.keys(groups).sort((a, b) => {
-        const newestA = Math.max(
-          ...groups[a].map((s) => new Date(s.date || 0).getTime()),
-        );
-        const newestB = Math.max(
-          ...groups[b].map((s) => new Date(s.date || 0).getTime()),
-        );
+        const getNewestTime = (countryGroup: typeof stamps) => {
+          return Math.max(
+            ...countryGroup.map((s) => {
+              // 1. Try the manual 'date' field
+              const dateVal = s.date ? new Date(s.date).getTime() : 0;
+              // 2. Fallback to 'createdAt' if date is invalid or 0
+              const createdVal = s.createdAt?.seconds
+                ? s.createdAt.seconds * 1000
+                : 0;
+
+              return isNaN(dateVal) || dateVal === 0 ? createdVal : dateVal;
+            }),
+          );
+        };
+
+        const newestA = getNewestTime(groups[a]);
+        const newestB = getNewestTime(groups[b]);
+
         return newestB - newestA; // Newest country first
       });
     }
@@ -658,10 +672,42 @@ export default function Home() {
     }
   };
 
+  const handleSharePassport = async (stamps: any[]) => {
+    const totalStamps = stamps.length;
+    const uniqueCountries = new Set(stamps.map((s) => s.country)).size;
+
+    // Create a cool text summary
+    const shareText =
+      `🌐 NOCTURNE PASSPORT EXPORT\n` +
+      `--------------------------\n` +
+      `Rank: VANGUARD\n` +
+      `Total Logs: ${totalStamps}\n` +
+      `Countries Explored: ${uniqueCountries}\n\n` +
+      `Latest Entry: ${stamps[0]?.venue} | ${stamps[0]?.city}, ${stamps[0]?.country}\n` +
+      `--------------------------\n` +
+      `Sent from Nocturne App`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: "My Nocturne Passport",
+          text: shareText,
+          url: window.location.href,
+        });
+      } catch (err) {
+        console.log("Share cancelled or failed", err);
+      }
+    } else {
+      // Fallback: Copy to clipboard
+      await navigator.clipboard.writeText(shareText);
+      alert("Passport summary copied to clipboard!");
+    }
+  };
+
   if (!mounted) return null;
 
   return (
-    <div className="flex min-h-screen bg-zinc-950">
+    <div className="flex min-h-screen bg-zinc-950 pb-32 px-4 md:px-0">
       {/* SLIDE-OUT SIDEBAR */}
       <aside
         className={`fixed left-0 top-0 h-full z-9999 transition-all duration-500
@@ -1007,7 +1053,7 @@ export default function Home() {
               Cultural Passport
             </p>
 
-            <div className="flex gap-8 mt-8 border-t border-black/5 dark:border-white/5 pt-8">
+            {/* <div className="flex gap-8 mt-8 border-t border-black/5 dark:border-white/5 pt-8">
               <div className="text-center">
                 <p className="text-[9px] font-mono text-black/30 dark:text-white/30 tracking-[0.2em] mb-1">
                   TOTAL STAMPS
@@ -1025,7 +1071,7 @@ export default function Home() {
                   {uniqueCities.toString().padStart(2, "0")}
                 </p>
               </div>
-            </div>
+            </div> */}
 
             {/* Toggle Positioned relative to header */}
             <div className="absolute -top-4 right-0 md:right-4">
@@ -1160,12 +1206,21 @@ export default function Home() {
 
                   <button
                     type="submit"
-                    disabled={isPending}
-                    className="w-full py-4 font-black rounded-2xl text-xs uppercase transition-all shadow-xl
-                          bg-purple-600 text-white hover:bg-purple-700
-                          dark:bg-white dark:text-black dark:hover:bg-teal-400"
+                    disabled={isIssuing}
+                    className={`w-full p-4 rounded-xl font-mono text-xs tracking-widest transition-all mt-4 ${
+                      isIssuing
+                        ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                        : "bg-[#2DD4BF] text-black font-bold shadow-[0_0_15px_rgba(45,212,191,0.3)]"
+                    }`}
                   >
-                    {isPending ? "STAMPING..." : "ISSUE STAMP"}
+                    {isIssuing ? (
+                      <div className="flex items-center justify-center gap-2">
+                        <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                        <span>{status || "STAMPING..."}</span>
+                      </div>
+                    ) : (
+                      "ISSUE STAMP"
+                    )}
                   </button>
                 </form>
               </div>
@@ -1227,6 +1282,41 @@ export default function Home() {
                 </button>
               </div>
             )}
+            <div className="flex justify-between items-end p-6 border-b border-white/5 sticky top-0 bg-black/80 backdrop-blur-md z-40">
+              <div>
+                <h1 className="text-2xl font-bold text-white tracking-tighter">
+                  PASSPORT
+                </h1>
+                <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
+                  Digital Identity / {stamps.length} Logs
+                </p>
+              </div>
+
+              {/* THE SHARE BUTTON */}
+              <button
+                onClick={() => handleSharePassport(stamps)}
+                className="group flex items-center gap-2 bg-teal-500/10 border border-teal-500/30 hover:bg-teal-500 hover:border-teal-500 px-4 py-2 rounded-xl transition-all duration-300"
+              >
+                <span className="text-[10px] font-mono text-teal-500 group-hover:text-black font-bold uppercase">
+                  Export
+                </span>
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  className="text-teal-500 group-hover:text-black"
+                >
+                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                  <polyline points="16 6 12 2 8 6" />
+                  <line x1="12" y1="2" x2="12" y2="15" />
+                </svg>
+              </button>
+            </div>
             {view === "passport" ? (
               <>
                 {Object.entries(groupedStamps).map(([country, items]) => {
