@@ -3,6 +3,7 @@
 import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import { getValidCoordinates } from "@/lib/utils";
 
 interface Stamp {
   id: string;
@@ -68,18 +69,26 @@ export default function NocturneMap({
 
   const cityHubs = stamps.reduce(
     (acc, stamp) => {
-      if (!stamp.lat || !stamp.lng) return acc;
-      const key = `${stamp.city.toUpperCase()}`;
+      // FIX: Instead of checking stamp.lat/lng directly, get normalized coords
+      // Leaflet uses [lat, lng], so we destructure accordingly
+      const [lng, lat] = getValidCoordinates(stamp);
+
+      // If we still have 0,0 and no fallback, skip it
+      if (lat === 0 && lng === 0) return acc;
+
+      const key = `${stamp.city.toUpperCase().trim()}`;
+
       if (!acc[key]) {
         acc[key] = {
           city: stamp.city,
           country: stamp.country,
-          lat: stamp.lat,
-          lng: stamp.lng,
+          lat: lat, // Use the valid lat
+          lng: lng, // Use the valid lng
           items: [],
           color: stamp.color,
         };
       }
+
       acc[key].items.push(stamp);
       return acc;
     },

@@ -1,0 +1,38 @@
+
+export const COUNTRY_MAPPINGS: Record<string, string> = {
+  // North America
+  "USA": "USA",
+  "UNITED STATES": "USA",
+  "U.S.A.": "USA",
+  
+  // Europe
+  "UK": "UK",
+  "UNITED KINGDOM": "UK",
+  "GREAT BRITAIN": "UK",
+  "ENGLAND": "UK",
+  "NETHERLANDS": "NETHERLANDS",
+  "HOLLAND": "NETHERLANDS",
+  "NORTH MACEDONIA": "MACEDONIA",
+  "MACEDONIA": "MACEDONIA",
+  "CZECHIA": "CZECH REPUBLIC",
+  "CZECH REPUBLIC": "CZECH REPUBLIC",
+  "TURKEY": "TÜRKİYE",
+  "TÜRKIYE": "TÜRKİYE",
+  
+  // Middle East & Asia
+  "UAE": "UAE",
+  "UNITED ARAB EMIRATES": "UAE",
+  "EMIRATES": "UAE",
+  "ROK": "SOUTH KOREA",
+  "SOUTH KOREA": "SOUTH KOREA",
+  "DPRK": "NORTH KOREA",
+  "NORTH KOREA": "NORTH KOREA",
+  "VIET NAM": "VIETNAM",
+  "PRC": "CHINA",
+  "CHINA": "CHINA",
+  
+  // Others
+  "RUSSIAN FEDERATION": "RUSSIA",
+  "RUSSIA": "RUSSIA"
+};
+

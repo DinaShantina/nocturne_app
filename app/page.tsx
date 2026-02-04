@@ -1247,7 +1247,7 @@ export default function Home() {
                     <section
                       id={`section-${country.toLowerCase()}`}
                       key={country}
-                      className="mb-24 relative isolate scroll-mt-24"
+                      className="mb-5 relative isolate scroll-mt-24"
                     >
                       <div className="flex flex-col mb-10 px-8">
                         <div className="flex justify-between items-end w-full">
