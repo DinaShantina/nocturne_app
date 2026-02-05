@@ -1,10 +1,17 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import { useActionState, useEffect, useState, useMemo, useRef } from "react";
+import React, {
+  useActionState,
+  useEffect,
+  useState,
+  useMemo,
+  useRef,
+} from "react";
 import { submitEvent } from "./actions";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import ScrollToTop from "./components/ScrollToTop";
 import { calculateTotalTravel } from "./utils/geoUtils";
 // Firebase Imports
 import { db, storage } from "@/lib/firebase";
@@ -22,7 +29,14 @@ import {
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import imageCompression from "browser-image-compression";
-import { normalizeCountryName, getValidCoordinates } from "@/lib/utils";
+import {
+  normalizeCountryName,
+  getValidCoordinates,
+  getRank,
+  getRankData,
+  handleSharePassport,
+} from "@/lib/utils";
+import { CATEGORIES, GENRE_COLORS } from "@/lib/constants";
 
 const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
   ssr: false,
@@ -121,31 +135,9 @@ interface Stamp {
     | any; // 'any' handles the transition from Firestore Timestamp to local Date
 }
 
-const CATEGORIES = [
-  "RAVE", // For the heavy nights (Techno/Electronic)
-  "ART", // Galleries, Exhibitions, Street Art
-  "JAZZ", // Live music, Jazz bars
-  "DINING", // Underground restaurants, late-night spots
-  "LOUNGE", // Chill bars, rooftops
-  "CINEMA", // Indie movies, open-air screenings
-  "FESTIVAL", // Large scale multi-day events
-  "CONCERT", // Live bands, gigs
-];
-
-const GENRE_COLORS: { [key: string]: string } = {
-  RAVE: "#ff4d4d", // Neon Red
-  ART: "#bc13fe", // Electric Purple
-  JAZZ: "#ffb700", // Amber/Gold
-  DINING: "#00f2ff", // Nocturne Teal
-  LOUNGE: "#4ade80", // Soft Green
-  CINEMA: "#f472b6", // Rose Pink
-  FESTIVAL: "#ffffff", // Bright White
-  CONCERT: "#3b82f6", // Deep Blue
-};
-
 export default function Home() {
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const [state, formAction, isPending] = useActionState(submitEvent, null);
+  const [formAction] = useActionState(submitEvent, null);
   const [stamps, setStamps] = useState<Stamp[]>([]);
   const [mounted, setMounted] = useState(false);
 
@@ -184,12 +176,21 @@ export default function Home() {
   } | null>(null);
   const [isDnaOpen, setIsDnaOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [tempCoords, setTempCoords] = useState<{
+  const [, setTempCoords] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
-  const [isIssuing, setIsIssuing] = useState(false);
+  const [isIssuing] = useState(false);
   const [status, setStatus] = useState(""); // To show "Uploading..." etc.
+  const [scrollY, setScrollY] = React.useState(0);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  React.useEffect(() => {
+    const handleScroll = () => setScrollY(window.scrollY);
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
+  }, []);
 
   const totalDistance = useMemo(() => {
     if (!stamps || stamps.length === 0) return 0;
@@ -313,7 +314,6 @@ export default function Home() {
   }, []);
 
   // --- Stats Logic ---
-  const totalStamps = stamps.length;
   const uniqueCities = useMemo(
     () => new Set(stamps.map((s) => s.city.toUpperCase())).size,
     [stamps],
@@ -323,6 +323,7 @@ export default function Home() {
     e.preventDefault();
     const formElement = e.currentTarget;
     const formData = new FormData(formElement);
+    setStatus("STAMPING...");
 
     // 1. Prepare variables
     let imageUrl = "";
@@ -474,8 +475,15 @@ export default function Home() {
   );
 
   const groupedStamps = useMemo(() => {
-    // 1. Group the stamps
-    const groups = filteredStamps.reduce(
+    // 1. Filter stamps based on search query first
+    const searchFiltered = filteredStamps.filter(
+      (stamp) =>
+        stamp.country?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        stamp.city?.toLowerCase().includes(searchQuery.toLowerCase()),
+    );
+
+    // 2. Group the search-filtered stamps
+    const groups = searchFiltered.reduce(
       (acc, stamp) => {
         const country = stamp.country?.toUpperCase() || "WORLDWIDE";
         if (!acc[country]) acc[country] = [];
@@ -529,7 +537,7 @@ export default function Home() {
     });
 
     return orderedGroups;
-  }, [filteredStamps, countrySortOrder]);
+  }, [filteredStamps, countrySortOrder, searchQuery]);
 
   const nextImage = () => {
     if (galleryIndex !== null) {
@@ -604,32 +612,7 @@ export default function Home() {
     return { label: cat, percentage, color: GENRE_COLORS[cat] };
   }).filter((stat) => stat.percentage > 0); // Only show categories the user has visited
 
-  const getRank = (count: number) => {
-    if (count >= 50) return { name: "GHOST", color: "#ffffff", level: "05" };
-    if (count >= 30)
-      return { name: "OPERATIVE", color: "#ff4d4d", level: "04" };
-    if (count >= 15) return { name: "VANGUARD", color: "#bc13fe", level: "03" };
-    if (count >= 5) return { name: "RESIDENT", color: "#00f2ff", level: "02" };
-    return { name: "INITIATE", color: "#71717a", level: "01" };
-  };
-
   const currentRank = getRank(stamps.length);
-
-  const getRankData = (count: number) => {
-    if (count >= 50)
-      return {
-        title: "Ghost",
-        level: "V",
-        color: "text-white shadow-[0_0_10px_#fff]",
-      };
-    if (count >= 30)
-      return { title: "Operative", level: "IV", color: "text-red-500" };
-    if (count >= 15)
-      return { title: "Vanguard", level: "III", color: "text-purple-500" };
-    if (count >= 5)
-      return { title: "Resident", level: "II", color: "text-teal-500" };
-    return { title: "Initiate", level: "I", color: "text-zinc-500" };
-  };
 
   const rank = getRankData(stamps.length);
 
@@ -669,38 +652,6 @@ export default function Home() {
       window.location.reload();
     } catch (err) {
       console.error("Cleanup Error:", err);
-    }
-  };
-
-  const handleSharePassport = async (stamps: any[]) => {
-    const totalStamps = stamps.length;
-    const uniqueCountries = new Set(stamps.map((s) => s.country)).size;
-
-    // Create a cool text summary
-    const shareText =
-      `🌐 NOCTURNE PASSPORT EXPORT\n` +
-      `--------------------------\n` +
-      `Rank: VANGUARD\n` +
-      `Total Logs: ${totalStamps}\n` +
-      `Countries Explored: ${uniqueCountries}\n\n` +
-      `Latest Entry: ${stamps[0]?.venue} | ${stamps[0]?.city}, ${stamps[0]?.country}\n` +
-      `--------------------------\n` +
-      `Sent from Nocturne App`;
-
-    if (navigator.share) {
-      try {
-        await navigator.share({
-          title: "My Nocturne Passport",
-          text: shareText,
-          url: window.location.href,
-        });
-      } catch (err) {
-        console.log("Share cancelled or failed", err);
-      }
-    } else {
-      // Fallback: Copy to clipboard
-      await navigator.clipboard.writeText(shareText);
-      alert("Passport summary copied to clipboard!");
     }
   };
 
@@ -1087,142 +1038,146 @@ export default function Home() {
                 + Issue New Stamp
               </button>
             ) : (
-              <div className="w-full max-w-xl animate-in fade-in slide-in-from-top-4 duration-500">
-                <div className="flex justify-end mb-2">
-                  <button
-                    onClick={() => setShowForm(false)}
-                    className="text-[10px] font-mono opacity-50 hover:opacity-100"
-                  >
-                    CLOSE [X]
-                  </button>
-                </div>
-                {/* Entry Form */}
-                <form
-                  ref={formRef}
-                  action={formAction}
-                  onSubmit={(e) => handleCreateStamp(e)}
-                  className="w-full max-w-md space-y-4 mx-auto mb-12 relative z-10 p-8 rounded-[2.5rem] 
-                        bg-purple-50/50 border-purple-200 shadow-[0_20px_50px_rgba(147,51,234,0.1)] 
-                        dark:bg-white/3 dark:border-white/10 dark:shadow-none transition-all duration-500 border"
-                >
-                  <div className="flex flex-col gap-2">
+              /* FIXED OVERLAY: This ensures the form is always visible in the center of the screen */
+              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+                <div className="w-full max-w-xl animate-in fade-in zoom-in duration-300 relative py-8">
+                  {/* Close Button Container */}
+                  <div className="flex justify-end mb-2 max-w-md mx-auto">
                     <button
-                      type="button"
-                      onClick={detectLocation}
-                      className="w-full py-2 rounded-xl text-[9px] font-mono uppercase tracking-[0.2em] transition-all
-                            border border-purple-400 text-purple-600 hover:bg-purple-100
-                            dark:border-teal-500/30 dark:text-teal-500 dark:hover:bg-teal-500/10"
+                      onClick={() => setShowForm(false)}
+                      className="text-[10px] font-mono opacity-50 hover:opacity-100 text-white bg-white/10 px-3 py-1 rounded-full"
                     >
-                      <span className="relative z-10 flex items-center justify-center gap-2">
-                        {isLocating
-                          ? "Scanning Environment..."
-                          : "📍 Detect Location"}
-                      </span>
+                      CLOSE [X]
                     </button>
+                  </div>
+
+                  {/* Entry Form */}
+                  <form
+                    ref={formRef}
+                    action={formAction}
+                    onSubmit={(e) => handleCreateStamp(e)}
+                    /* Changed bg-white/3 to a solid dark color for better readability in the modal */
+                    className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-6 md:p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
+                  >
+                    <div className="flex flex-col gap-2">
+                      <button
+                        type="button"
+                        onClick={detectLocation}
+                        className="w-full py-2 rounded-xl text-[9px] font-mono uppercase tracking-[0.2em] transition-all
+                    border border-purple-400 text-purple-600 hover:bg-purple-100
+                    dark:border-teal-500/30 dark:text-teal-500 dark:hover:bg-teal-500/10"
+                      >
+                        <span className="relative z-10 flex items-center justify-center gap-2">
+                          {isLocating
+                            ? "Scanning Environment..."
+                            : "📍 Detect Location"}
+                        </span>
+                      </button>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <input
+                          name="city"
+                          placeholder="CITY"
+                          required
+                          className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border
+                      bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
+                      dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
+                        />
+                        <input
+                          name="country"
+                          placeholder="COUNTRY"
+                          required
+                          className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border
+                      bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
+                      dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
+                        />
+                      </div>
+                    </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                      <input
-                        name="city"
-                        placeholder="CITY"
-                        required
-                        className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border
-                              bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
-                              dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
-                      />
-                      <input
-                        name="country"
-                        placeholder="COUNTRY"
-                        required
-                        className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border
-                              bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
-                              dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <select
-                      name="category"
-                      className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all
-                            bg-white border-purple-200 text-purple-900
-                            dark:bg-black/60 dark:border-white/10 dark:text-white"
-                    >
-                      <option value="">NO CATEGORY</option>
-                      {CATEGORIES.map((c) => (
-                        <option key={c} value={c}>
-                          {c}
-                        </option>
-                      ))}
-                    </select>
-                    <NocturneCalendar
-                      value={createDate}
-                      onChange={setCreateDate}
-                    />
-                  </div>
-
-                  <input
-                    name="venue"
-                    placeholder="VENUE"
-                    required
-                    className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all
-                          bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
-                          dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
-                  />
-
-                  <input
-                    name="activity"
-                    placeholder="ACTIVITY"
-                    required
-                    className="w-full rounded-xl px-4 py-3 text-xs font-mono outline-none border transition-all
-                          bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
-                          dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
-                  />
-
-                  <div className="space-y-2">
-                    <div className="relative">
-                      <input
-                        type="file"
-                        name="image"
-                        accept="image/*"
-                        onChange={(e) =>
-                          setImageUploaded(!!e.target.files?.length)
-                        }
-                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
-                      />
-                      <div
-                        className={`w-full border border-dashed rounded-xl py-4 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase transition-all
-                    ${
-                      imageUploaded
-                        ? "border-purple-500 text-purple-600 bg-purple-50 dark:border-teal-500 dark:text-teal-500 dark:bg-transparent"
-                        : "border-purple-200 text-purple-300 bg-white dark:border-white/10 dark:text-white dark:bg-black/40"
-                    }`}
+                      <select
+                        name="category"
+                        className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all
+                    bg-white border-purple-200 text-purple-900
+                    dark:bg-black/60 dark:border-white/10 dark:text-white"
                       >
-                        {imageUploaded
-                          ? "Evidence Attached"
-                          : "Upload Evidence"}
+                        <option value="">NO CATEGORY</option>
+                        {CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
+                      <NocturneCalendar
+                        value={createDate}
+                        onChange={setCreateDate}
+                      />
+                    </div>
+
+                    <input
+                      name="venue"
+                      placeholder="VENUE"
+                      required
+                      className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all
+                  bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
+                  dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
+                    />
+
+                    <input
+                      name="activity"
+                      placeholder="ACTIVITY"
+                      required
+                      className="w-full rounded-xl px-4 py-3 text-xs font-mono outline-none border transition-all
+                  bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
+                  dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
+                    />
+
+                    <div className="space-y-2">
+                      <div className="relative">
+                        <input
+                          type="file"
+                          name="image"
+                          accept="image/*"
+                          onChange={(e) =>
+                            setImageUploaded(!!e.target.files?.length)
+                          }
+                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        />
+                        <div
+                          className={`w-full border border-dashed rounded-xl py-4 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase transition-all
+                ${
+                  imageUploaded
+                    ? "border-purple-500 text-purple-600 bg-purple-50 dark:border-teal-500 dark:text-teal-500 dark:bg-transparent"
+                    : "border-purple-200 text-purple-300 bg-white dark:border-white/10 dark:text-white dark:bg-black/40"
+                }`}
+                        >
+                          {imageUploaded
+                            ? "Evidence Attached"
+                            : "Upload Evidence"}
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <button
-                    type="submit"
-                    disabled={isIssuing}
-                    className={`w-full p-4 rounded-xl font-mono text-xs tracking-widest transition-all mt-4 ${
-                      isIssuing
-                        ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
-                        : "bg-[#2DD4BF] text-black font-bold shadow-[0_0_15px_rgba(45,212,191,0.3)]"
-                    }`}
-                  >
-                    {isIssuing ? (
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
-                        <span>{status || "STAMPING..."}</span>
-                      </div>
-                    ) : (
-                      "ISSUE STAMP"
-                    )}
-                  </button>
-                </form>
+                    <button
+                      type="submit"
+                      disabled={isIssuing}
+                      className={`w-full p-4 rounded-xl font-mono text-xs tracking-widest transition-all mt-4 ${
+                        isIssuing
+                          ? "bg-zinc-800 text-zinc-500 cursor-not-allowed"
+                          : "bg-[#2DD4BF] text-black font-bold shadow-[0_0_15px_rgba(45,212,191,0.3)]"
+                      }`}
+                    >
+                      {isIssuing ? (
+                        <div className="flex items-center justify-center gap-2">
+                          <div className="w-3 h-3 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+                          <span>{status || "STAMPING..."}</span>
+                        </div>
+                      ) : (
+                        "ISSUE STAMP"
+                      )}
+                    </button>
+                  </form>
+                </div>
               </div>
             )}
           </div>
@@ -1282,41 +1237,111 @@ export default function Home() {
                 </button>
               </div>
             )}
-            <div className="flex justify-between items-end p-6 border-b border-white/5 sticky top-0 bg-black/80 backdrop-blur-md z-40">
-              <div>
-                <h1 className="text-2xl font-bold text-white tracking-tighter">
-                  PASSPORT
-                </h1>
-                <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest">
-                  Digital Identity / {stamps.length} Logs
-                </p>
-              </div>
+            <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5 px-6 py-4">
+              <div className="flex justify-between items-center max-w-7xl mx-auto">
+                {/* Left: Passport Info */}
+                <div className="flex flex-col">
+                  <h1 className="text-xl font-bold tracking-tighter text-white uppercase">
+                    Passport
+                  </h1>
+                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                    Digital Identity / {stamps.length} Logs
+                  </span>
+                </div>
 
-              {/* THE SHARE BUTTON */}
-              <button
-                onClick={() => handleSharePassport(stamps)}
-                className="group flex items-center gap-2 bg-teal-500/10 border border-teal-500/30 hover:bg-teal-500 hover:border-teal-500 px-4 py-2 rounded-xl transition-all duration-300"
-              >
-                <span className="text-[10px] font-mono text-teal-500 group-hover:text-black font-bold uppercase">
-                  Export
-                </span>
-                <svg
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  className="text-teal-500 group-hover:text-black"
+                <div className="flex items-center justify-start flex-1 gap-2 ">
+                  {view !== "map" && (
+                    <div
+                      className={`transition-all duration-300 ease-in-out flex items-center px-6 ${isSearchOpen ? "w-60" : "w-10"}`}
+                    >
+                      {isSearchOpen ? (
+                        <div className="relative w-full flex items-center">
+                          <input
+                            autoFocus
+                            type="text"
+                            placeholder="Search country..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onBlur={() =>
+                              !searchQuery && setIsSearchOpen(false)
+                            } // Close if empty and loses focus
+                            className="w-full bg-zinc-900 border border-teal-500/30 rounded-full py-2 px-4 text-xs text-white focus:outline-none focus:border-teal-500"
+                          />
+                          <button
+                            onClick={() => {
+                              setSearchQuery("");
+                              setIsSearchOpen(false);
+                            }}
+                            className="absolute right-3 text-zinc-500 hover:text-white"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setIsSearchOpen(true)}
+                          className="p-2 hover:bg-white/5 rounded-full transition-all"
+                        >
+                          <svg
+                            width="20"
+                            height="20"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="text-teal-500"
+                          >
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+                {/* Center: THE NEW ISSUE BUTTON (Sticky) */}
+                <button
+                  onClick={() => setShowForm(true)}
+                  className={`hidden md:flex items-center gap-2 bg-teal-500 hover:bg-teal-400 mx-6 text-black px-4 py-2 rounded-full transition-all active:scale-95 shadow-[0_0_15px_rgba(45,212,191,0.2)] ${
+                    // Only show if we are on PASSPORT view AND scrolled down
+                    view === "passport" && scrollY > 100
+                      ? "opacity-100 translate-y-0 pointer-events-auto"
+                      : "opacity-0 -translate-y-2 pointer-events-none"
+                  }`}
                 >
-                  <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
-                  <polyline points="16 6 12 2 8 6" />
-                  <line x1="12" y1="2" x2="12" y2="15" />
-                </svg>
-              </button>
+                  <span className="text-[10px] font-black uppercase tracking-tighter">
+                    + ISSUE NEW STAMP
+                  </span>
+                </button>
+                {/* Right: Export Button */}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => handleSharePassport(stamps)}
+                    className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-2 rounded-lg hover:bg-teal-500/10 hover:border-teal-500 transition-all group"
+                  >
+                    <span className="text-[10px] font-mono text-zinc-400 group-hover:text-teal-500">
+                      EXPORT
+                    </span>
+                    <svg
+                      width="12"
+                      height="12"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                      className="text-zinc-500 group-hover:text-teal-500"
+                    >
+                      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                      <polyline points="16 6 12 2 8 6" />
+                      <line x1="12" y1="2" x2="12" y2="15" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
             </div>
+
             {view === "passport" ? (
               <>
                 {Object.entries(groupedStamps).map(([country, items]) => {
@@ -1335,7 +1360,7 @@ export default function Home() {
                     <section
                       id={`section-${country.toLowerCase()}`}
                       key={country}
-                      className="mb-5 relative isolate scroll-mt-24"
+                      className="my-5 relative isolate scroll-mt-24"
                     >
                       <div className="flex flex-col mb-10 px-8">
                         <div className="flex justify-between items-end w-full">
@@ -1673,77 +1698,74 @@ export default function Home() {
                     </div>
                   </div>
                 ) : (
-                  <div className="p-10 pt-16">
-                    {/* Increased padding for the close button */}
-                    <h2 className="text-xl font-black uppercase tracking-widest mb-8 text-teal-400 italic">
-                      Modify Log
-                    </h2>
-                    <form
-                      ref={editFormRef}
-                      onSubmit={handleUpdate}
-                      className="w-full max-w-md space-y-4 mx-auto relative z-10 p-8 rounded-[2.5rem] bg-purple-50/50 border-purple-200 shadow-[0_20px_50px_rgba(147,51,234,0.1)] dark:bg-white/3 dark:border-white/10 dark:shadow-none transition-all duration-500 border"
-                    >
-                      <div className="grid grid-cols-2 gap-4">
-                        <input
-                          name="city"
-                          defaultValue={selectedStamp.city}
-                          placeholder="CITY"
-                          required
-                          className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
-                        />
-                        <input
-                          name="country"
-                          defaultValue={selectedStamp.country}
-                          placeholder="COUNTRY"
-                          required
-                          className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
-                        />
-                      </div>
-                      <div className="flex flex-col gap-2 mt-4">
-                        <label className="text-[10px] text-zinc-500 font-mono text-left uppercase">
-                          📍 Click map to pin location
-                        </label>
-                        <LocationPicker
-                          initialPos={[
-                            selectedStamp?.lat || 0,
-                            selectedStamp?.lng || 0,
-                          ]}
-                          onLocationSelect={(lat, lng) =>
-                            setTempCoords({ lat, lng })
-                          }
-                        />
-                        {tempCoords && (
-                          <p className="text-[9px] text-teal-500 font-mono mt-1">
-                            NEW COORDS: {tempCoords.lat.toFixed(4)},{" "}
-                            {tempCoords.lng.toFixed(4)}
-                          </p>
-                        )}
-                        {/* Hidden inputs to make sure the coordinates get sent with the form */}
-                        <input
-                          type="hidden"
-                          name="lat"
-                          value={tempCoords?.lat || selectedStamp?.lat || 0}
-                        />
-                        <input
-                          type="hidden"
-                          name="lng"
-                          value={tempCoords?.lng || selectedStamp?.lng || 0}
-                        />
+                  <form
+                    ref={editFormRef}
+                    onSubmit={handleUpdate}
+                    /* Changed max-w-md to max-w-4xl for laptop breathability */
+                    className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-6 md:p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
+                  >
+                    {/* Header inside the form for better context */}
+                    <div className="text-center md:text-left mb-4">
+                      <h2 className="text-xl font-black uppercase tracking-widest text-teal-400 italic">
+                        Modify Log
+                      </h2>
+                    </div>
+
+                    {/* New Grid Wrapper: 1 Column on Mobile, 2 Columns on Laptop */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                      {/* LEFT COLUMN: Map and Location Info */}
+                      <div className="space-y-4">
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            name="city"
+                            defaultValue={selectedStamp.city}
+                            placeholder="CITY"
+                            required
+                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-black/40 border-white/10 text-white focus:border-teal-500"
+                          />
+                          <input
+                            name="country"
+                            defaultValue={selectedStamp.country}
+                            placeholder="COUNTRY"
+                            required
+                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-black/40 border-white/10 text-white focus:border-teal-500"
+                          />
+                        </div>
+
+                        <div className="flex flex-col gap-2">
+                          <label className="text-[10px] text-zinc-500 font-mono uppercase">
+                            📍 Pin Location
+                          </label>
+                          <div className="rounded-2xl overflow-hidden  h-[200px] md:h-[250px]">
+                            <LocationPicker
+                              initialPos={[
+                                selectedStamp?.lat || 0,
+                                selectedStamp?.lng || 0,
+                              ]}
+                              onLocationSelect={(lat, lng) =>
+                                setTempCoords({ lat, lng })
+                              }
+                            />
+                          </div>
+                        </div>
                       </div>
 
-                      <input
-                        name="venue"
-                        defaultValue={selectedStamp.venue}
-                        placeholder="VENUE"
-                        required
-                        className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
-                      />
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-2">
+                      {/* RIGHT COLUMN: Details and Actions */}
+                      <div className="space-y-4 flex flex-col justify-between">
+                        <input
+                          name="venue"
+                          defaultValue={selectedStamp.venue}
+                          placeholder="VENUE"
+                          required
+                          className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border bg-black/40 border-white/10 text-white focus:border-teal-500"
+                        />
+
+                        <div className="flex flex-col gap-4">
+                          {/* Changed from grid-cols-2 to flex-col */}
                           <select
                             name="category"
                             defaultValue={selectedStamp.category}
-                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all bg-white border-purple-200 text-purple-900 dark:bg-black/60 dark:border-white/10 dark:text-white"
+                            className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border bg-black/40 border-white/10 text-white focus:border-teal-500 transition-all"
                           >
                             <option value="">UNCATEGORIZED</option>
                             {CATEGORIES.map((c) => (
@@ -1752,80 +1774,78 @@ export default function Home() {
                               </option>
                             ))}
                           </select>
+                          <NocturneCalendar
+                            value={editDate || selectedStamp.date}
+                            onChange={setEditDate}
+                          />
                         </div>
-                        <NocturneCalendar
-                          value={editDate || selectedStamp.date}
-                          onChange={setEditDate}
-                        />
-                      </div>
-                      <textarea
-                        name="activity"
-                        defaultValue={selectedStamp.activity}
-                        rows={3}
-                        placeholder="ACTIVITY"
-                        className="w-full rounded-xl px-4 py-3 text-xs font-mono outline-none border transition-all bg-white border-purple-200 text-purple-900 placeholder:text-purple-300 dark:bg-black/60 dark:border-white/10 dark:text-white dark:focus:border-teal-500"
-                      />
 
-                      <div className="relative">
-                        <input
-                          type="file"
-                          name="newImage"
-                          accept="image/*"
-                          onChange={(e) =>
-                            setEditImageUploaded(!!e.target.files?.length)
-                          }
-                          className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                        <textarea
+                          name="activity"
+                          defaultValue={selectedStamp.activity}
+                          rows={3}
+                          placeholder="ACTIVITY"
+                          className="w-full rounded-xl px-4 py-3 text-xs font-mono outline-none border bg-black/40 border-white/10 text-white focus:border-teal-500 resize-none"
                         />
-                        <div
-                          className={`w-full border border-dashed rounded-xl py-4 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase transition-all
-                          ${
-                            editImageUploaded
-                              ? "border-purple-500 text-purple-600 bg-purple-50 dark:border-teal-500 dark:text-teal-500 dark:bg-transparent"
-                              : "border-purple-200 text-purple-300 bg-white dark:border-white/10 dark:text-white dark:bg-black/40"
-                          }`}
-                        >
-                          {editImageUploaded
-                            ? "New Evidence Ready"
-                            : "Change Image (Optional)"}
-                        </div>
-                      </div>
 
-                      <div className="flex gap-3 pt-6">
-                        <button
-                          type="button"
-                          onClick={() => setShowDeleteConfirm(selectedStamp.id)}
-                          className="p-4 bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
-                        >
-                          <svg
-                            width="20"
-                            height="20"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2.5"
+                        {/* File Upload remains similar but more compact */}
+                        <div className="relative">
+                          <input
+                            type="file"
+                            name="newImage"
+                            accept="image/*"
+                            onChange={(e) =>
+                              setEditImageUploaded(!!e.target.files?.length)
+                            }
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
+                          />
+                          <div
+                            className={`w-full border border-dashed rounded-xl py-3 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase transition-all ${editImageUploaded ? "border-teal-500 text-teal-500" : "border-white/10 text-white/40 bg-black/20"}`}
                           >
-                            <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                          </svg>
-                        </button>
-                        <button
-                          type="submit"
-                          className="flex-1 py-4 text-[10px] font-black uppercase border rounded-2xl transition-all border-purple-200 text-purple-400 hover:bg-purple-50 dark:border-white/10 dark:text-white/40 dark:hover:bg-white/5"
-                        >
-                          Save Update
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setIsEditing(false);
-                            setSelectedStamp(null);
-                          }}
-                          className="flex-1 py-4 text-[10px] font-black uppercase border border-white/10 rounded-2xl hover:bg-white/5 transition-colors text-white/40"
-                        >
-                          Back
-                        </button>
+                            {editImageUploaded
+                              ? "✓ Evidence Ready"
+                              : "Change Image"}
+                          </div>
+                        </div>
                       </div>
-                    </form>
-                  </div>
+                    </div>
+
+                    {/* FOOTER ACTIONS: Full width at the bottom */}
+                    <div className="flex gap-3 pt-4 border-t border-white/5">
+                      <button
+                        type="button"
+                        onClick={() => setShowDeleteConfirm(selectedStamp.id)}
+                        className="p-4 bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
+                      >
+                        <svg
+                          width="20"
+                          height="20"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                        >
+                          <path d="M3 6h18M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
+                        </svg>
+                      </button>
+                      <button
+                        type="submit"
+                        className="flex-1 py-4 text-[10px] font-black uppercase bg-teal-500 text-black rounded-2xl transition-all hover:bg-teal-400 shadow-[0_0_20px_rgba(45,212,191,0.2)]"
+                      >
+                        Save Update
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsEditing(false);
+                          setSelectedStamp(null);
+                        }}
+                        className="flex-1 py-4 text-[10px] font-black uppercase border border-white/10 rounded-2xl hover:bg-white/5 transition-colors text-white/60"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
                 )}
               </div>
             </div>
@@ -2001,32 +2021,7 @@ export default function Home() {
           )}
         </div>
       </main>
-      {/* SCROLL TO TOP BUTTON */}
-      <button
-        onClick={scrollToTop}
-        className={`fixed bottom-8 right-8 z-80 group flex flex-col items-center gap-2 transition-all duration-500 
-        ${showScroll ? "opacity-100 translate-y-0" : "opacity-0 translate-y-10 pointer-events-none"}`}
-      >
-        {/* The Label (Appears on hover) */}
-        <span className="text-[8px] font-mono text-zinc-500 uppercase tracking-[0.4em] opacity-0 group-hover:opacity-100 transition-opacity">
-          Top
-        </span>
-
-        {/* The Arrow Circle */}
-        <div className="w-12 h-12 rounded-full border border-white/10 bg-black/50 backdrop-blur-md flex items-center justify-center group-hover:border-teal-500/50 group-hover:bg-zinc-900 transition-all active:scale-90">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2.5"
-            className="text-zinc-500 group-hover:text-teal-500 transition-colors"
-          >
-            <path d="M18 15l-6-6-6 6" />
-          </svg>
-        </div>
-      </button>
+      <ScrollToTop />
     </div>
   );
 }
