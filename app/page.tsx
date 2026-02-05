@@ -939,7 +939,7 @@ export default function Home() {
           ${showSidebar ? "md:pl-80" : "md:pl-16"}`}
       >
         {showSuccess && (
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] w-[90%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-500">
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-10000 w-[90%] max-w-sm animate-in fade-in slide-in-from-top-4 duration-500">
             <div className="bg-zinc-900/90 backdrop-blur-xl border border-teal-500/30 p-4 rounded-2xl shadow-2xl flex items-center gap-4">
               {/* Animated Checkmark */}
               <div className="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center border border-teal-500/40">
@@ -1039,7 +1039,7 @@ export default function Home() {
               </button>
             ) : (
               /* FIXED OVERLAY: This ensures the form is always visible in the center of the screen */
-              <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+              <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
                 <div className="w-full max-w-xl animate-in fade-in zoom-in duration-300 relative py-8">
                   {/* Close Button Container */}
                   <div className="flex justify-end mb-2 max-w-md mx-auto">
@@ -1054,7 +1054,7 @@ export default function Home() {
                   {/* Entry Form */}
                   <form
                     ref={formRef}
-                    action={formAction}
+                    // action={formAction}
                     onSubmit={(e) => handleCreateStamp(e)}
                     /* Changed bg-white/3 to a solid dark color for better readability in the modal */
                     className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-6 md:p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
@@ -1736,7 +1736,7 @@ export default function Home() {
                           <label className="text-[10px] text-zinc-500 font-mono uppercase">
                             📍 Pin Location
                           </label>
-                          <div className="rounded-2xl overflow-hidden  h-[200px] md:h-[250px]">
+                          <div className="rounded-2xl overflow-hidden h-50 md:h-62.5">
                             <LocationPicker
                               initialPos={[
                                 selectedStamp?.lat || 0,
