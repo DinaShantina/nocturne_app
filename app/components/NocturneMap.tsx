@@ -1,6 +1,8 @@
 "use client";
 
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import { useEffect, useState } from "react";
+import { Geolocation } from "@capacitor/geolocation";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { getValidCoordinates } from "@/lib/utils";
@@ -20,11 +22,11 @@ interface Stamp {
 
 interface NocturneMapProps {
   stamps: Stamp[];
-  onSelectLocation: () => void;
+  onSelectLocation?: () => void;
   onCitySelect: (country: string, city: string) => void;
 }
 
-// 1. Move this OUTSIDE or keep it as a plain function (No Hooks inside here!)
+// 1. Helper function for the glowing city icons
 const createCityIcon = (count: number, color: string, image?: string) => {
   const glowSize = Math.min(15 + count * 5, 40);
 
@@ -60,35 +62,79 @@ const createCityIcon = (count: number, color: string, image?: string) => {
   });
 };
 
+// 2. Helper component to move the camera to the user
+function RecenterMap({ position }: { position: [number, number] }) {
+  const map = useMap();
+  useEffect(() => {
+    if (position) {
+      map.setView(position, 12);
+    }
+  }, [position, map]);
+  return null;
+}
+
 export default function NocturneMap({
   stamps,
-  // onSelectLocation,
   onCitySelect,
 }: NocturneMapProps) {
-  // 2. All Hooks (useState, useMemo) go HERE, at the top of the component.
+  const [userLocation, setUserLocation] = useState<[number, number] | null>(
+    null,
+  );
 
+  // 🚀 Hybrid GPS Logic (Web + Native)
+  useEffect(() => {
+    const fetchLocation = async () => {
+      try {
+        // Try native Capacitor first (for Android/iOS)
+        const permissions = await Geolocation.requestPermissions().catch(
+          () => null,
+        );
+
+        if (permissions && permissions.location === "granted") {
+          const coordinates = await Geolocation.getCurrentPosition({
+            enableHighAccuracy: true,
+          });
+          setUserLocation([
+            coordinates.coords.latitude,
+            coordinates.coords.longitude,
+          ]);
+        } else {
+          // 🌐 Web Fallback for Laptop/Browser
+          navigator.geolocation.getCurrentPosition(
+            (pos) =>
+              setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+            (err) => console.error("Web GPS Failed", err),
+            { enableHighAccuracy: true },
+          );
+        }
+      } catch (error) {
+        // Final fallback if the above fails
+        navigator.geolocation.getCurrentPosition(
+          (pos) => setUserLocation([pos.coords.latitude, pos.coords.longitude]),
+          (err) => console.error("Final GPS Fallback Failed", err),
+        );
+      }
+    };
+    fetchLocation();
+  }, []);
+
+  // Organize stamps into City Hubs
   const cityHubs = stamps.reduce(
     (acc, stamp) => {
-      // FIX: Instead of checking stamp.lat/lng directly, get normalized coords
-      // Leaflet uses [lat, lng], so we destructure accordingly
       const [lng, lat] = getValidCoordinates(stamp);
-
-      // If we still have 0,0 and no fallback, skip it
       if (lat === 0 && lng === 0) return acc;
 
       const key = `${stamp.city.toUpperCase().trim()}`;
-
       if (!acc[key]) {
         acc[key] = {
           city: stamp.city,
           country: stamp.country,
-          lat: lat, // Use the valid lat
-          lng: lng, // Use the valid lng
+          lat: lat,
+          lng: lng,
           items: [],
           color: stamp.color,
         };
       }
-
       acc[key].items.push(stamp);
       return acc;
     },
@@ -115,6 +161,23 @@ export default function NocturneMap({
       >
         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
 
+        {/* 🚀 Recenter map when GPS fixes */}
+        {userLocation && <RecenterMap position={userLocation} />}
+
+        {/* 🚀 Blue User Marker */}
+        {userLocation && (
+          <Marker
+            position={userLocation}
+            icon={L.divIcon({
+              className: "user-marker",
+              html: `<div style="width:14px; height:14px; background:#3b82f6; border:2px solid white; border-radius:50%; box-shadow:0 0 15px #3b82f6;"></div>`,
+              iconSize: [14, 14],
+              iconAnchor: [7, 7],
+            })}
+          />
+        )}
+
+        {/* City Hub Markers */}
         {Object.values(cityHubs).map((hub) => (
           <Marker
             key={hub.city}
@@ -135,7 +198,6 @@ export default function NocturneMap({
                     {hub.items.length} STAMPS COLLECTED
                   </p>
                 </div>
-
                 <div className="max-h-32 overflow-y-auto flex flex-col gap-2 mb-4">
                   {hub.items.map((item) => (
                     <div
@@ -152,7 +214,6 @@ export default function NocturneMap({
                     </div>
                   ))}
                 </div>
-
                 <button
                   onClick={() => onCitySelect(hub.country, hub.city)}
                   className="w-full py-2 bg-teal-500 hover:bg-teal-400 text-black text-[9px] font-black uppercase tracking-tighter rounded-lg transition-all active:scale-95"
@@ -164,8 +225,8 @@ export default function NocturneMap({
           </Marker>
         ))}
       </MapContainer>
+
       <style jsx global>{`
-        /* The main popup box */
         .nocturne-popup .leaflet-popup-content-wrapper {
           background: #09090b !important;
           color: white !important;
@@ -173,26 +234,14 @@ export default function NocturneMap({
           border-radius: 12px !important;
           padding: 0 !important;
         }
-
-        /* The little triangle pointing to the city */
         .nocturne-popup .leaflet-popup-tip {
           background: #09090b !important;
-          border: 1px solid rgba(255, 255, 255, 0.1) !important;
         }
-
-        /* Remove default Leaflet padding around your content */
         .nocturne-popup .leaflet-popup-content {
           margin: 0 !important;
           width: auto !important;
         }
-
-        /* Style the close button if it's visible */
-        .nocturne-popup .leaflet-popup-close-button {
-          color: white !important;
-          padding: 8px !important;
-        }
       `}</style>
-      ;
     </div>
   );
 }

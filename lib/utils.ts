@@ -1,5 +1,8 @@
 // lib/utils.ts
 import { COUNTRY_MAPPINGS } from "./constants";
+import { toJpeg } from "html-to-image";
+import { Share } from "@capacitor/share";
+import { Filesystem, Directory } from "@capacitor/filesystem";
 
 export const normalizeCountryName = (name: string): string => {
   if (!name) return "";
@@ -70,33 +73,47 @@ export const getRankData = (count: number) => {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const handleSharePassport = async (stamps: any[]) => {
-  const totalStamps = stamps.length;
-  const uniqueCountries = new Set(stamps.map((s) => s.country)).size;
+  const node = document.getElementById("passport-share-card");
+  if (!node) return;
 
-  // Create a cool text summary
-  const shareText =
-    `🌐 NOCTURNE PASSPORT EXPORT\n` +
-    `--------------------------\n` +
-    `Rank: VANGUARD\n` +
-    `Total Logs: ${totalStamps}\n` +
-    `Countries Explored: ${uniqueCountries}\n\n` +
-    `Latest Entry: ${stamps[0]?.venue} | ${stamps[0]?.city}, ${stamps[0]?.country}\n` +
-    `--------------------------\n` +
-    `Sent from Nocturne App`;
+  try {
+    // 1. Generate the Image
+    const dataUrl = await toJpeg(node, {
+      quality: 0.95,
+      backgroundColor: "#000000",
+      cacheBust: true, // Prevents old images from sticking around
+    });
 
-  if (navigator.share) {
-    try {
-      await navigator.share({
-        title: "My Nocturne Passport",
-        text: shareText,
-        url: window.location.href,
-      });
-    } catch (err) {
-      console.log("Share cancelled or failed", err);
-    }
-  } else {
-    // Fallback: Copy to clipboard
-    await navigator.clipboard.writeText(shareText);
-    alert("Passport summary copied to clipboard!");
+    // 2. Convert DataURL to a physical file in the phone's temporary storage
+    const fileName = `nocturne-passport-${Date.now()}.jpg`;
+    const base64Data = dataUrl.split(",")[1]; // Remove the "data:image/jpeg;base64," part
+
+    const savedFile = await Filesystem.writeFile({
+      path: fileName,
+      data: base64Data,
+      directory: Directory.Cache,
+    });
+
+    // 3. Prepare the summary text
+    const shareText =
+      `🌐 NOCTURNE PASSPORT EXPORT\n` +
+      `Rank: VANGUARD\n` +
+      `Total Logs: ${stamps.length}\n` +
+      `Latest: ${stamps[0]?.venue} | ${stamps[0]?.city}`;
+    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    `--------------------------\n` +
+      `Join the network: nocturne.app\n` +
+      `#NocturneProtocol #Vanguard`;
+
+    // 4. 🔥 Open the Native Android Share Drawer
+    await Share.share({
+      title: "My Nocturne Passport",
+      text: shareText, // Now this will include the "Join the network" line!
+      url: savedFile.uri,
+      dialogTitle: "Export Passport Card",
+    });
+  } catch (err) {
+    console.error("Export failed:", err);
+    alert("Could not generate export card.");
   }
 };

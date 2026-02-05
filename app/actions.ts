@@ -1,5 +1,5 @@
 // actions.ts
-"use server";
+"use client";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 export type FormState = {

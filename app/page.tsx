@@ -37,6 +37,7 @@ import {
   handleSharePassport,
 } from "@/lib/utils";
 import { CATEGORIES, GENRE_COLORS } from "@/lib/constants";
+import PassportShareCard from "./components/PassportShareCardProps";
 
 const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
   ssr: false,
@@ -1039,7 +1040,7 @@ export default function Home() {
               </button>
             ) : (
               /* FIXED OVERLAY: This ensures the form is always visible in the center of the screen */
-              <div className="fixed inset-0 z-100 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+              <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
                 <div className="w-full max-w-xl animate-in fade-in zoom-in duration-300 relative py-8">
                   {/* Close Button Container */}
                   <div className="flex justify-end mb-2 max-w-md mx-auto">
@@ -1229,7 +1230,7 @@ export default function Home() {
                   onClick={() => setCountrySortOrder("RECENT")}
                   className={`px-6 py-2 rounded-xl text-[10px] font-mono tracking-widest transition-all border ${
                     countrySortOrder === "RECENT"
-                      ? "bg-purple-600 text-white border-purple-600 dark:bg-teal-500 dark:text-black dark:border-teal-500 shadow-lg"
+                      ? "bg-purple-600 text-white <navborder-purple-600 dark:bg-teal-500 dark:text-black dark:border-teal-500 shadow-lg"
                       : "bg-transparent border-black/10 text-black/40 dark:border-white/10 dark:text-white/40"
                   }`}
                 >
@@ -1242,8 +1243,13 @@ export default function Home() {
                 {/* LEFT: Passport Info & Mobile Issue Button */}
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col">
-                    <h1 className="text-xl font-bold tracking-tighter text-white uppercase">
+                    <h1 className="text-xl font-bold tracking-tighter text-white uppercase flex items-center gap-2">
                       Passport
+                      {/* This small pulsing dot makes the "mobile connection" look real for your demo */}
+                      <span className="flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-teal-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                      </span>
                     </h1>
                     <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
                       Digital Identity / {stamps.length} Logs
@@ -2037,6 +2043,9 @@ export default function Home() {
         </div>
       </main>
       <ScrollToTop />
+      <div style={{ position: "absolute", left: "-9999px", top: "0" }}>
+        <PassportShareCard stamps={stamps} />
+      </div>
     </div>
   );
 }
