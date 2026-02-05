@@ -1238,24 +1238,42 @@ export default function Home() {
               </div>
             )}
             <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5 px-6 py-4">
-              <div className="flex justify-between items-center max-w-7xl mx-auto">
-                {/* Left: Passport Info */}
-                <div className="flex flex-col">
-                  <h1 className="text-xl font-bold tracking-tighter text-white uppercase">
-                    Passport
-                  </h1>
-                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
-                    Digital Identity / {stamps.length} Logs
-                  </span>
+              <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
+                {/* LEFT: Passport Info & Mobile Issue Button */}
+                <div className="flex justify-between items-center">
+                  <div className="flex flex-col">
+                    <h1 className="text-xl font-bold tracking-tighter text-white uppercase">
+                      Passport
+                    </h1>
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                      Digital Identity / {stamps.length} Logs
+                    </span>
+                  </div>
+
+                  {/* ISSUE BUTTON: Sticky Header Version (Always hidden on Map) */}
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className={`flex md:hidden items-center gap-2 bg-teal-500 text-black px-3 py-1.5 rounded-full transition-all active:scale-95 ${
+                      view === "passport" && scrollY > 100
+                        ? "opacity-100"
+                        : "opacity-0 pointer-events-none"
+                    }`}
+                  >
+                    <span className="text-[9px] font-black uppercase tracking-tighter">
+                      + ISSUE
+                    </span>
+                  </button>
                 </div>
 
-                <div className="flex items-center justify-start flex-1 gap-2 ">
+                {/* RIGHT: Search & Export (Row on Desktop, New Row on Mobile) */}
+                <div className="flex items-center justify-between md:justify-end gap-3 md:flex-1">
+                  {/* Search Toggle */}
                   {view !== "map" && (
                     <div
-                      className={`transition-all duration-300 ease-in-out flex items-center px-6 ${isSearchOpen ? "w-60" : "w-10"}`}
+                      className={`transition-all duration-300 flex items-center ${isSearchOpen ? "flex-1 md:flex-none md:w-60" : "w-auto"}`}
                     >
                       {isSearchOpen ? (
-                        <div className="relative w-full flex items-center">
+                        <div className="flex items-center gap-3 w-full relative">
                           <input
                             autoFocus
                             type="text"
@@ -1264,15 +1282,15 @@ export default function Home() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onBlur={() =>
                               !searchQuery && setIsSearchOpen(false)
-                            } // Close if empty and loses focus
-                            className="w-full bg-zinc-900 border border-teal-500/30 rounded-full py-2 px-4 text-xs text-white focus:outline-none focus:border-teal-500"
+                            }
+                            className="w-full bg-zinc-900 border border-white/10 rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-teal-500"
                           />
                           <button
                             onClick={() => {
                               setSearchQuery("");
                               setIsSearchOpen(false);
                             }}
-                            className="absolute right-3 text-zinc-500 hover:text-white"
+                            className="absolute right-3 text-zinc-500"
                           >
                             ✕
                           </button>
@@ -1280,17 +1298,15 @@ export default function Home() {
                       ) : (
                         <button
                           onClick={() => setIsSearchOpen(true)}
-                          className="p-2 hover:bg-white/5 rounded-full transition-all"
+                          className="p-2 hover:bg-white/5 rounded-full border border-transparent hover:border-white/10 transition-all"
                         >
                           <svg
-                            width="20"
-                            height="20"
+                            width="18"
+                            height="18"
                             viewBox="0 0 24 24"
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
                             className="text-teal-500"
                           >
                             <circle cx="11" cy="11" r="8" />
@@ -1300,26 +1316,25 @@ export default function Home() {
                       )}
                     </div>
                   )}
-                </div>
-                {/* Center: THE NEW ISSUE BUTTON (Sticky) */}
-                <button
-                  onClick={() => setShowForm(true)}
-                  className={`hidden md:flex items-center gap-2 bg-teal-500 hover:bg-teal-400 mx-6 text-black px-4 py-2 rounded-full transition-all active:scale-95 shadow-[0_0_15px_rgba(45,212,191,0.2)] ${
-                    // Only show if we are on PASSPORT view AND scrolled down
-                    view === "passport" && scrollY > 100
-                      ? "opacity-100 translate-y-0 pointer-events-auto"
-                      : "opacity-0 -translate-y-2 pointer-events-none"
-                  }`}
-                >
-                  <span className="text-[10px] font-black uppercase tracking-tighter">
-                    + ISSUE NEW STAMP
-                  </span>
-                </button>
-                {/* Right: Export Button */}
-                <div className="flex items-center gap-3">
+
+                  {/* Desktop Sticky Issue Button (Hidden on mobile) */}
+                  <button
+                    onClick={() => setShowForm(true)}
+                    className={`hidden md:flex items-center gap-2 bg-teal-500 hover:bg-teal-400 mx-4 text-black px-4 py-2 rounded-full transition-all shadow-[0_0_15px_rgba(45,212,191,0.2)] ${
+                      view === "passport" && scrollY > 100
+                        ? "opacity-100 scale-100"
+                        : "opacity-0 scale-90 pointer-events-none"
+                    }`}
+                  >
+                    <span className="text-[10px] font-black uppercase tracking-tighter">
+                      + ISSUE NEW STAMP
+                    </span>
+                  </button>
+
+                  {/* Export Button */}
                   <button
                     onClick={() => handleSharePassport(stamps)}
-                    className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-2 rounded-lg hover:bg-teal-500/10 hover:border-teal-500 transition-all group"
+                    className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-lg hover:bg-teal-500/10 hover:border-teal-500 transition-all group"
                   >
                     <span className="text-[10px] font-mono text-zinc-400 group-hover:text-teal-500">
                       EXPORT
@@ -1702,7 +1717,7 @@ export default function Home() {
                     ref={editFormRef}
                     onSubmit={handleUpdate}
                     /* Changed max-w-md to max-w-4xl for laptop breathability */
-                    className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-6 md:p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
+                    className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-4 md:p-10 rounded-3xl md:rounded-[2.5rem] bg-zinc-900/90 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
                   >
                     {/* Header inside the form for better context */}
                     <div className="text-center md:text-left mb-4">
