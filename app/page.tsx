@@ -1054,7 +1054,7 @@ export default function Home() {
                   {/* Entry Form */}
                   <form
                     ref={formRef}
-                    action={formAction}
+                    // action={formAction}
                     onSubmit={(e) => handleCreateStamp(e)}
                     /* Changed bg-white/3 to a solid dark color for better readability in the modal */
                     className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-6 md:p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
