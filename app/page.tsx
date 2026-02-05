@@ -1054,7 +1054,7 @@ export default function Home() {
                   {/* Entry Form */}
                   <form
                     ref={formRef}
-                    // action={formAction}
+                    action={formAction}
                     onSubmit={(e) => handleCreateStamp(e)}
                     /* Changed bg-white/3 to a solid dark color for better readability in the modal */
                     className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-6 md:p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
@@ -1969,7 +1969,7 @@ export default function Home() {
               </div>
             </div>
           )}
-          {!selectedStamp && !isEditing && (
+          {!selectedStamp && !isEditing && !showForm && (
             <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-[9999] animate-in fade-in slide-in-from-bottom-4 duration-300">
               <button
                 onClick={() => setShowSidebar(!showSidebar)}
