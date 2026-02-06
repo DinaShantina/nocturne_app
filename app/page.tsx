@@ -1470,7 +1470,7 @@ export default function Home() {
                     </svg>
                   </button>
 
-                  {/* 2. THE HIDDEN CARD (Moved outside the button) */}
+                  {/* 2. THE HIDDEN CARD  */}
                   <div
                     style={{ position: "absolute", left: "-9999px", top: "0" }}
                   >
@@ -1484,8 +1484,14 @@ export default function Home() {
 
                   {/* 3. WEB ONLY PREVIEW MODAL (Moved outside the button) */}
                   {webPreview && (
-                    <div className="fixed inset-0 z-10000 bg-black/95 flex flex-col items-center justify-center p-6 backdrop-blur-xl">
-                      <div className="max-w-sm w-full bg-zinc-900 border border-white/10 p-5 rounded-[30px] shadow-2xl">
+                    <div
+                      className="fixed inset-0 z-99999 bg-black/95 flex flex-col items-center justify-center p-6 backdrop-blur-xl pointer-events-auto"
+                      onClick={() => setWebPreview(null)}
+                    >
+                      <div
+                        className="max-w-sm w-full bg-zinc-900 border border-white/10 p-5 rounded-[30px] shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <p className="text-[#ff00ff] font-mono text-[9px] uppercase tracking-[0.3em] text-center mb-5">
                           Passport Generated
                         </p>
@@ -1499,9 +1505,9 @@ export default function Home() {
                         <div className="flex flex-col gap-3">
                           <button
                             onClick={async (e) => {
-                              e.stopPropagation(); // Prevents clicking "through" the modal
+                              e.stopPropagation();
                               await downloadWebPassport(webPreview, stamps);
-                              setWebPreview(null); // This will now close correctly
+                              setWebPreview(null);
                             }}
                             className="w-full bg-[#ff00ff] text-white font-black py-4 rounded-xl uppercase text-[10px] tracking-widest"
                           >
@@ -2156,56 +2162,60 @@ export default function Home() {
               </div>
             </div>
           )}
-          {!selectedStamp && !isEditing && !showForm && (
-            <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-9999 animate-in fade-in slide-in-from-bottom-4 duration-300">
-              <button
-                onClick={() => setShowSidebar(!showSidebar)}
-                className={`flex items-center gap-2 px-4 py-2 transition-all active:scale-95 rounded-full border
+          {!selectedStamp &&
+            !isEditing &&
+            !showForm &&
+            galleryIndex === null &&
+            !webPreview && (
+              <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-9999 animate-in fade-in slide-in-from-bottom-4 duration-300">
+                <button
+                  onClick={() => setShowSidebar(!showSidebar)}
+                  className={`flex items-center gap-2 px-4 py-2 transition-all active:scale-95 rounded-full border
                 /* Adaptive Colors */
                 bg-purple-200/50 dark:bg-zinc-900 
                 border-purple-300/50 dark:border-white/10 
                 hover:border-purple-500 dark:hover:border-teal-500`}
-              >
-                <svg
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2.5"
-                  className="text-purple-600 dark:text-teal-500"
                 >
-                  {/* Dynamic icon change: X when open, Burger when closed */}
-                  {showSidebar ? (
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  ) : (
-                    <path d="M3 12h18M3 6h18M3 18h18" />
-                  )}
-                </svg>
-                <span className="text-[10px] font-black uppercase italic tracking-widest text-purple-950 dark:text-white">
-                  {showSidebar ? "Close" : "Dashboard"}
-                </span>
-              </button>
-              <button
-                onClick={() => setView("passport")}
-                className={`text-[10px] font-black tracking-widest transition-all ${view === "passport" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
-              >
-                PASSPORT
-              </button>
-              <button
-                onClick={() => {
-                  setView("map");
-                  // This scrolls the window down so the map is centered
-                  setTimeout(() => {
-                    window.scrollTo({ top: 600, behavior: "smooth" });
-                  }, 100);
-                }}
-                className={`text-[10px] font-black tracking-widest transition-all ${view === "map" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
-              >
-                GLOBAL MAP
-              </button>
-            </nav>
-          )}
+                  <svg
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    className="text-purple-600 dark:text-teal-500"
+                  >
+                    {/* Dynamic icon change: X when open, Burger when closed */}
+                    {showSidebar ? (
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    ) : (
+                      <path d="M3 12h18M3 6h18M3 18h18" />
+                    )}
+                  </svg>
+                  <span className="text-[10px] font-black uppercase italic tracking-widest text-purple-950 dark:text-white">
+                    {showSidebar ? "Close" : "Dashboard"}
+                  </span>
+                </button>
+                <button
+                  onClick={() => setView("passport")}
+                  className={`text-[10px] font-black tracking-widest transition-all ${view === "passport" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
+                >
+                  PASSPORT
+                </button>
+                <button
+                  onClick={() => {
+                    setView("map");
+                    // This scrolls the window down so the map is centered
+                    setTimeout(() => {
+                      window.scrollTo({ top: 600, behavior: "smooth" });
+                    }, 100);
+                  }}
+                  className={`text-[10px] font-black tracking-widest transition-all ${view === "map" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
+                >
+                  GLOBAL MAP
+                </button>
+              </nav>
+            )}
         </div>
       </main>
       {view !== "map" && <ScrollToTop />}
