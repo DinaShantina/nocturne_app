@@ -142,7 +142,6 @@ interface Stamp {
 }
 
 export default function Home() {
-  const [formAction] = useActionState(submitEvent, null);
   const [stamps, setStamps] = useState<Stamp[]>([]);
   const [mounted, setMounted] = useState(false);
 

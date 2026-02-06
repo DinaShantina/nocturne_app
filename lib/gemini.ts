@@ -1,5 +1,3 @@
-"use server"; // This tells Next.js to run this ONLY on the server
-
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
