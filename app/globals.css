@@ -179,6 +179,7 @@ body {
 
 .dark .stsearch-box input {
   color: #ffffff;
+  border: none;
 }
 
 .dark .stdropdown-container {
@@ -187,4 +188,32 @@ body {
 
 .dark .stdropdown-item {
   color: #ffffff;
+}
+/* FIX: CountrySelect dropdown text should be BLACK in light mode */
+:root:not(.dark) .std-input ul,
+:root:not(.dark) .std-input ul * {
+  color: #000000 !important;
+}
+
+/* Also enforce item text specifically (some libs override spans) */
+:root:not(.dark) .std-input li,
+:root:not(.dark) .std-input li span,
+:root:not(.dark) .stdropdown-item,
+:root:not(.dark) .std-input .country-dropdown li,
+:root:not(.dark) .std-input .city-dropdown li {
+  color: #000000 !important;
+}
+
+/* Dropdown search input text in light mode */
+:root:not(.dark) .stsearch-box input {
+  color: #000000 !important;
+}
+/* DIAGNOSTIC: force the dropdown text black in ALL modes */
+.stdropdown-item {
+  color: #000000 !important;
+  border: none !important;
+}
+.dark .stdropdown-container {
+  border-radius: 10px !important;
+  padding: 2px !important;
 }

@@ -2,13 +2,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, {
-  useActionState,
-  useEffect,
-  useState,
-  useMemo,
-  useRef,
-} from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { submitEvent } from "./actions";
 import dynamic from "next/dynamic";
 import Image from "next/image";
@@ -32,7 +26,6 @@ import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import imageCompression from "browser-image-compression";
 import {
   normalizeCountryName,
-  getValidCoordinates,
   getRank,
   getRankData,
   handleSharePassport,
@@ -40,7 +33,6 @@ import {
 } from "@/lib/utils";
 import { CATEGORIES, GENRE_COLORS } from "@/lib/constants";
 import PassportShareCard from "./components/PassportShareCardProps";
-import { generateVanguardReport } from "@/lib/gemini";
 import { CountrySelect } from "react-country-state-city";
 import "react-country-state-city/dist/react-country-state-city.css";
 import { GetCountries } from "react-country-state-city";
@@ -184,7 +176,8 @@ export default function Home() {
     lat: number;
     lng: number;
   } | null>(null);
-  const [isIssuing] = useState(false);
+  const [isIssuing, setIsIssuing] = useState(false);
+
   const [status, setStatus] = useState(""); // To show "Uploading..." etc.
   const [scrollY, setScrollY] = React.useState(0);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -194,16 +187,38 @@ export default function Home() {
   const [detectedCountry, setDetectedCountry] = useState<any>(null);
   const [countryKey, setCountryKey] = useState(0);
   const [webPreview, setWebPreview] = useState<string | null>(null);
+  const stickySentinelRef = useRef<HTMLDivElement | null>(null);
+  const [isHeaderStuck, setIsHeaderStuck] = useState(false);
+
+  useEffect(() => {
+    if (!stickySentinelRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        // When sentinel is NOT visible → sticky is active
+        setIsHeaderStuck(!entry.isIntersecting);
+      },
+      {
+        threshold: 0,
+      },
+    );
+
+    observer.observe(stickySentinelRef.current);
+
+    return () => observer.disconnect();
+  }, []);
 
   const onExportClick = async () => {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    const result = await handleSharePassport(stamps);
-
-    if (result) {
-      setWebPreview(result);
+    setIsIssuing(true);
+    try {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      const result = await handleSharePassport(stamps);
+      if (result) setWebPreview(result);
+    } finally {
+      setIsIssuing(false);
     }
   };
+
   useEffect(() => {
     if (webPreview || galleryIndex !== null) {
       document.body.style.overflow = "hidden";
@@ -259,11 +274,8 @@ export default function Home() {
     // 1. Safety check: If no stamps, distance must be 0
     if (!stamps || stamps.length < 2) return 0;
 
-    // 2. Log it to your console to see if it's actually running
-    console.log("Re-calculating distance for", stamps.length, "stamps");
-
     return calculateTotalTravel(stamps);
-  }, [stamps]); // MUST have stamps here
+  }, [stamps]);
 
   const toggleCityFilter = (country: string, city: string) => {
     setActiveCityFilters((prev) => {
@@ -401,6 +413,8 @@ export default function Home() {
 
   const handleCreateStamp = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (isIssuing) return;
+    setIsIssuing(true);
     const formElement = e.currentTarget;
     const formData = new FormData(formElement);
     setStatus("STAMPING...");
@@ -494,6 +508,7 @@ export default function Home() {
       setShowForm(false);
       setDetectedCoords(null);
       setShowSuccess(true);
+      setDetectedCountry("");
 
       setTimeout(() => setShowSuccess(false), 3000);
       setTimeout(() => {
@@ -504,6 +519,9 @@ export default function Home() {
     } catch (error: any) {
       console.error("Critical Failure:", error);
       alert("System Error: " + (error.message || "Unknown Error"));
+    } finally {
+      setIsIssuing(false);
+      setStatus("");
     }
   };
   const handleUpdate = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -685,14 +703,15 @@ export default function Home() {
     }, 200); // Increased delay slightly to ensure DOM is ready
   };
 
-  // Add this listener to your useEffect
   useEffect(() => {
-    const checkScroll = () => {
-      if (window.scrollY > 400) setShowScroll(true);
-      else setShowScroll(false);
+    const handleScroll = () => {
+      const y = window.scrollY;
+      setScrollY(y);
+      setShowScroll(y > 400);
     };
-    window.addEventListener("scroll", checkScroll);
-    return () => window.removeEventListener("scroll", checkScroll);
+
+    window.addEventListener("scroll", handleScroll, { passive: true });
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const stats = CATEGORIES.map((cat) => {
@@ -759,12 +778,12 @@ export default function Home() {
       )}
       <aside
         className={`fixed left-0 top-0 h-full z-9999 transition-all duration-500 bg-white/90 dark:bg-zinc-950/95 backdrop-blur-xl md:bg-purple-100 md:dark:bg-zinc-950 border-r border-black/10 dark:border-white/10 md:border-purple-300/50
-          ${galleryIndex !== null ? "-translate-x-full" : ""} 
-          ${
-            showSidebar
-              ? "w-80 translate-x-0 shadow-2xl md:shadow-none"
-              : "w-80 -translate-x-[calc(100%-64px)]"
-          }`}
+    ${galleryIndex !== null ? "-translate-x-full" : ""} 
+    ${
+      showSidebar
+        ? "w-80 translate-x-0"
+        : "w-80 -translate-x-full md:w-16 md:translate-x-0"
+    }`}
       >
         {/* PEEK AREA (The floating part on mobile) */}
         {!showSidebar && (
@@ -1194,7 +1213,7 @@ export default function Home() {
                           <div className="std-input w-full">
                             <CountrySelect
                               key={countryKey}
-                              defaultValue={detectedCountry} // 🚀 THE KEY TO BRIGHT WHITE TEXT
+                              defaultValue={detectedCountry}
                               onChange={(e: any) => {
                                 setDetectedCountry(e);
                                 const countryInput =
@@ -1205,7 +1224,7 @@ export default function Home() {
                                   countryInput.value = e.name.toUpperCase();
                               }}
                               placeHolder="SELECT COUNTRY"
-                              inputClassName="w-full rounded-xl px-4 py-[13px] text-xs font-mono uppercase bg-white border border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/60 dark:border-white/20 dark:text-white focus:border-teal-500 outline-none"
+                              inputClassName="w-full rounded-xl px-4 py-[11px] text-[11px] font-mono uppercase bg-white border border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/60 dark:border-white/20 dark:text-white focus:border-teal-500 outline-none"
                               containerClassName="border-none p-0 m-0 bg-transparent w-full"
                             />
                             <input
@@ -1366,7 +1385,7 @@ export default function Home() {
                   onClick={() => setCountrySortOrder("RECENT")}
                   className={`px-6 py-2 rounded-xl text-[10px] font-mono tracking-widest transition-all border ${
                     countrySortOrder === "RECENT"
-                      ? "bg-purple-600 text-white <navborder-purple-600 dark:bg-teal-500 dark:text-black dark:border-teal-500 shadow-lg"
+                      ? "bg-purple-600 text-white navborder-purple-600 dark:bg-teal-500 dark:text-black dark:border-teal-500 shadow-lg"
                       : "bg-transparent border-black/10 text-black/40 dark:border-white/10 dark:text-white/40"
                   }`}
                 >
@@ -1375,6 +1394,7 @@ export default function Home() {
               </div>
             )}
             {/* UPDATED: Sticky header now supports light + dark mode */}
+            <div ref={stickySentinelRef} className="h-px" />
             <div
               className="
     sticky top-0 z-50
@@ -1411,11 +1431,15 @@ export default function Home() {
                   <button
                     onClick={() => setShowForm(true)}
                     className={`
-          flex md:hidden items-center gap-2
-          bg-teal-500 text-black px-3 py-1.5 rounded-full
-          transition-all active:scale-95
-          ${view === "passport" && scrollY > 100 ? "opacity-100" : "opacity-0 pointer-events-none"}
-        `}
+    flex md:hidden items-center gap-2
+    bg-teal-500 text-black px-3 py-1.5 rounded-full
+    transition-all active:scale-95
+    ${
+      view === "passport" && isHeaderStuck
+        ? "opacity-100 scale-100"
+        : "opacity-0 scale-90 pointer-events-none"
+    }
+  `}
                   >
                     <span className="text-[9px] font-black uppercase tracking-tighter">
                       + ISSUE
@@ -1489,12 +1513,9 @@ export default function Home() {
                   {/* Desktop Issue Button */}
                   <button
                     onClick={() => setShowForm(true)}
-                    className={`
-          hidden md:flex items-center gap-2
-          bg-teal-500 hover:bg-teal-400 mx-4 text-black px-4 py-2 rounded-full
-          transition-all shadow-[0_0_15px_rgba(45,212,191,0.2)]
-          ${view === "passport" && scrollY > 100 ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"}
-        `}
+                    className={` hidden md:flex items-center gap-2 bg-teal-500 hover:bg-teal-400 mx-4 text-black px-4 py-2 rounded-full transition-all shadow-[0_0_15px_rgba(45,212,191,0.2)]
+                      ${view === "passport" && scrollY > 300 ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"}
+                      `}
                   >
                     <span className="text-[10px] font-black uppercase tracking-tighter">
                       + ISSUE NEW STAMP
@@ -1504,11 +1525,7 @@ export default function Home() {
                   {/* Export Button */}
                   <button
                     onClick={onExportClick}
-                    className="
-          flex items-center gap-2 px-4 py-2 rounded-lg transition-all group
-          bg-black/5 border border-black/10 hover:bg-teal-500/10 hover:border-teal-500
-          dark:bg-white/5 dark:border-white/10 dark:hover:bg-teal-500/10 dark:hover:border-teal-500
-        "
+                    className="flex items-center gap-2 px-4 py-2 rounded-lg transition-all group bg-black/5 border border-black/10 hover:bg-teal-500/10 hover:border-teal-500 dark:bg-white/5 dark:border-white/10 dark:hover:bg-teal-500/10 dark:hover:border-teal-500 "
                   >
                     <span className="text-[10px] font-mono text-zinc-700 group-hover:text-teal-600 dark:text-zinc-400 dark:group-hover:text-teal-500">
                       EXPORT
@@ -1530,7 +1547,8 @@ export default function Home() {
 
                   {/* Hidden Card */}
                   <div
-                    style={{ position: "absolute", left: "-9999px", top: "0" }}
+                    className="fixed top-0 left-0 opacity-0 pointer-events-none -z-10"
+                    aria-hidden="true"
                   >
                     <div id="passport-share-card">
                       <PassportShareCard
@@ -1561,9 +1579,9 @@ export default function Home() {
                     <section
                       id={`section-${country.toLowerCase()}`}
                       key={country}
-                      className="my-5 relative isolate scroll-mt-24"
+                      className="my-3 md:my-2 relative isolate scroll-mt-24"
                     >
-                      <div className="flex flex-col mb-10 px-8">
+                      <div className="flex flex-col mb-6 md:mb-10 px-4 md:px-8">
                         <div className="flex justify-between items-end w-full">
                           {/* 1. Country Header with integrated Stamp Counter */}
                           <div className="flex justify-between items-end w-full border-b border-purple-200/20 dark:border-white/5 pb-6">
@@ -1676,7 +1694,13 @@ export default function Home() {
                         ref={(el) => {
                           scrollRefs.current[country] = el;
                         }}
-                        className="flex overflow-x-auto pt-10 gap-12 pb-12 px-10 no-scrollbar scroll-smooth min-h-75"
+                        className={`flex overflow-x-auto no-scrollbar scroll-smooth pt-4 pb-6 px-3 gap-4 md:pt-10 md:pb-12 md:px-10 md:gap-12
+                            ${
+                              filteredItems.length === 1
+                                ? "justify-center md:justify-start"
+                                : "justify-start"
+                            }
+                          `}
                       >
                         {filteredItems.map((s) => {
                           // 1. Logic for the "Just Issued" badge
@@ -1689,15 +1713,14 @@ export default function Home() {
                           return (
                             <div
                               key={s.id}
-                              id={`stamp-${s.id}`} // <--- Target for the auto-scroll
+                              id={`stamp-${s.id}`}
                               onClick={() => {
                                 setSelectedStamp(s);
                                 setEditDate(s.date);
                                 setIsEditing(false);
                               }}
                               className={`
-                                    flex-none w-[45vw] h-[45vw] max-w-50 max-h-50    
-                                    md:w-64 md:h-64   
+                                    flex-none w-[32vw] h-[32vw] max-w-36 max-h-36 sm:w-[28vw] sm:h-[28vw] md:w-64 md:h-64
                                     group/stamp relative rounded-full flex items-center justify-center cursor-pointer 
                                     transition-all duration-500 hover:scale-110 active:scale-95 shadow-2xl 
                                     ${isJustIssued ? "z-100" : "z-10 hover:z-50"}
@@ -1711,10 +1734,10 @@ export default function Home() {
                               )}
 
                               <div
-                                className="absolute inset-0 rounded-full border-[3px] md:border-[6px]"
+                                className="absolute inset-0 rounded-full border-2 md:border-4"
                                 style={{ borderColor: s.color }}
                               ></div>
-                              <div className="absolute inset-1.5 rounded-full overflow-hidden z-0 bg-zinc-500 dark:bg-zinc-950">
+                              <div className="absolute inset-1 rounded-full overflow-hidden z-0 bg-zinc-500 dark:bg-zinc-950">
                                 {s.image && (
                                   <Image
                                     src={s.image}
@@ -2259,7 +2282,7 @@ export default function Home() {
           onClick={() => setWebPreview(null)}
         >
           <div
-            className="relative z-10000 max-w-sm w-full bg-white border border-black/10 dark:bg-zinc-900 dark:border-white/10 p-6 rounded-[30px] shadow-2xl"
+            className="relative z-10000 w-full max-w-[320px] bg-white border border-black/10 dark:bg-zinc-900 dark:border-white/10 p-6 rounded-[30px] shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <p className="text-[#ff00ff] font-mono text-[9px] uppercase tracking-[0.3em] text-center mb-5">

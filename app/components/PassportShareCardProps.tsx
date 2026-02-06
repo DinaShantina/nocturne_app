@@ -30,7 +30,7 @@ const PassportShareCard = ({
   return (
     <div
       id="passport-share-card"
-      className="relative w-90 h-185 bg-white text-zinc-700 dark:bg-black dark:text-zinc-400 p-8 flex flex-col overflow-hidden rounded-[30px] border border-black/10 dark:border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.1)] dark:shadow-[0_0_50px_rgba(0,0,0,1)]"
+      className="relative w-[420px] h-[820px] bg-white text-zinc-700 dark:bg-black dark:text-zinc-400 p-8 flex flex-col overflow-hidden rounded-[30px] border border-black/10 dark:border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.1)] dark:shadow-[0_0_50px_rgba(0,0,0,1)]"
     >
       {/* 1. CYBER SCAN LINES BACKGROUND (Dark Mode Only) */}
       <div className="absolute inset-0 opacity-10 pointer-events-none hidden dark:block bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] bg-size-[100%_2px,3px_100%]" />
