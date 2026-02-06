@@ -80,7 +80,21 @@ export default function NocturneMap({
   const [userLocation, setUserLocation] = useState<[number, number] | null>(
     null,
   );
+  const [isDark, setIsDark] = useState(true);
 
+  useEffect(() => {
+    const readTheme = () =>
+      setIsDark(document.documentElement.classList.contains("dark"));
+    readTheme();
+
+    const observer = new MutationObserver(readTheme);
+    observer.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class"],
+    });
+
+    return () => observer.disconnect();
+  }, []);
   // 🚀 Hybrid GPS Logic (Web + Native)
   useEffect(() => {
     const fetchLocation = async () => {
@@ -151,38 +165,57 @@ export default function NocturneMap({
       }
     >,
   );
-  function CustomZoomControls() {
+  function CustomZoomControls({ isDark }: { isDark: boolean }) {
     const map = useMap();
+
+    const base =
+      "w-12 h-12 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-2xl backdrop-blur-md active:scale-90 transition-all border-b-4";
+
+    const theme = isDark
+      ? "bg-black/90 border border-white/20 text-teal-400 border-b-teal-500/30"
+      : "bg-white/90 border border-black/10 text-teal-700 border-b-teal-600/30";
+
     return (
       <div className="absolute bottom-6 right-6 z-1000 flex flex-col gap-3">
         <button
           type="button"
           onClick={() => map.zoomIn()}
-          className="w-12 h-12 bg-black/90 border border-white/20 text-teal-400 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-2xl backdrop-blur-md active:scale-90 transition-all border-b-4 border-b-teal-500/30"
+          className={`${base} ${theme}`}
         >
           +
         </button>
         <button
           type="button"
           onClick={() => map.zoomOut()}
-          className="w-12 h-12 bg-black/90 border border-white/20 text-teal-400 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-2xl backdrop-blur-md active:scale-90 transition-all border-b-4 border-b-teal-500/30"
+          className={`${base} ${theme}`}
         >
           −
         </button>
       </div>
     );
   }
+
   return (
     <div className="h-125 w-full rounded-[40px] overflow-hidden border border-white/10 relative shadow-2xl">
       <MapContainer
         center={[20, 0]}
         zoom={2}
-        style={{ height: "100%", width: "100%", background: "#050505" }}
+        style={{
+          height: "100%",
+          width: "100%",
+          background: isDark ? "#050505" : "#f4f4f5",
+        }}
         zoomControl={false}
       >
-        <CustomZoomControls />
-        <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
-
+        <CustomZoomControls isDark={isDark} />
+        <TileLayer
+          url={
+            isDark
+              ? "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+              : "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          }
+          attribution="&copy; OpenStreetMap &copy; CARTO"
+        />
         {/* 🚀 Recenter map when GPS fixes */}
         {userLocation && <RecenterMap position={userLocation} />}
 
@@ -250,18 +283,28 @@ export default function NocturneMap({
 
       <style jsx global>{`
         .nocturne-popup .leaflet-popup-content-wrapper {
-          background: #09090b !important;
-          color: white !important;
-          border: 1px solid rgba(255, 255, 255, 0.1) !important;
+          background: var(--map-popup-bg) !important;
+          color: var(--map-popup-text) !important;
+          border: 1px solid var(--map-popup-border) !important;
           border-radius: 12px !important;
           padding: 0 !important;
         }
         .nocturne-popup .leaflet-popup-tip {
-          background: #09090b !important;
+          background: var(--map-popup-bg) !important;
         }
-        .nocturne-popup .leaflet-popup-content {
-          margin: 0 !important;
-          width: auto !important;
+      `}</style>
+
+      <style jsx global>{`
+        :root {
+          --map-popup-bg: rgba(255, 255, 255, 0.95);
+          --map-popup-text: #0a0a0a;
+          --map-popup-border: rgba(0, 0, 0, 0.1);
+        }
+
+        .dark {
+          --map-popup-bg: #09090b;
+          --map-popup-text: #ffffff;
+          --map-popup-border: rgba(255, 255, 255, 0.1);
         }
       `}</style>
     </div>

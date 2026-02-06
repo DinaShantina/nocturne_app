@@ -1,23 +1,29 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+// NEW: uses the recommended SDK and forces v1
+import { GoogleGenAI } from "@google/genai";
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+const apiKey = process.env.GEMINI_API_KEY;
+
+if (!apiKey) {
+  throw new Error("Missing GEMINI_API_KEY in env");
+}
+
+const ai = new GoogleGenAI({
+  apiKey,
+  httpOptions: { apiVersion: "v1" }, // <- forces stable v1
+});
 
 export async function generateVanguardReport(
-  // Only ask for what Gemini actually needs to avoid serialization errors
-  stamps: { venue: string; city: string }[],
+  stamps: Array<{ venue: string; city: string }>,
 ) {
-  const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+  if (!stamps?.length) return "Awaiting deployment data...";
 
-  // Now venueList only uses the simple strings
   const venueList = stamps.map((s) => `${s.venue} (${s.city})`).join(", ");
+  const prompt = `Deployments: ${venueList}. Write a one-sentence spy report (max 15 words).`;
 
-  const prompt = `Analyze these deployments: ${venueList}. Write a one-sentence "Intelligence Report" (max 20 words). Tone: Mysterious, spy-like. Output: Just the sentence.`;
+  const response = await ai.models.generateContent({
+    model: "gemini-1.5-flash",
+    contents: prompt,
+  });
 
-  try {
-    const result = await model.generateContent(prompt);
-    return (await result.response).text().trim();
-  } catch (error) {
-    console.error("Gemini Error:", error);
-    return "Operational patterns suggest high-tier resonance. Status: ELITE.";
-  }
+  return (response.text || "").trim() || "Deployment stabilized.";
 }

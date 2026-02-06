@@ -1,12 +1,15 @@
 import { NextResponse } from "next/server";
-import { generateVanguardReport } from "@/lib/gemini"; // Adjust path to where you saved step 1
+import { generateVanguardReport } from "@/lib/gemini";
 
 export async function POST(req: Request) {
   try {
     const { venues } = await req.json();
-    const report = await generateVanguardReport(venues);
+
+    const stamps = (venues || []).map((venue: string) => ({ venue, city: "" }));
+    const report = await generateVanguardReport(stamps);
+
     return NextResponse.json({ report });
-  } catch (error) {
+  } catch {
     return NextResponse.json(
       { report: "Deployment stabilized." },
       { status: 500 },

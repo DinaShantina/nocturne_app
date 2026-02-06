@@ -110,53 +110,81 @@ body {
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
-/* Force the dropdown list to be visible and correctly colored */
+/* CountrySelect dropdown — LIGHT (default) */
 .std-input {
   position: relative;
-  z-index: 9999 !important;
-  color: #000000 !important;
+  z-index: 9999;
+  color: #000000;
 }
 
-/* 1. Target the dropdown container */
 .std-input ul {
-  background-color: #09090b !important; /* zinc-950 */
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
-  z-index: 9999 !important;
+  background-color: #ffffff;
+  border: 1px solid #e5e7eb; /* zinc-200 */
+  z-index: 9999;
 }
 
-/* 2. THE MAIN FIX: Force the list item text color */
 .std-input li,
 .std-input li span,
 .std-input .city-dropdown li,
 .std-input .country-dropdown li {
-  color: #ffffff !important; /* Force text to white */
-  background-color: transparent !important;
+  color: #000000;
+  background-color: transparent;
   font-family:
     ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
-    "Courier New", monospace !important;
-  font-size: 11px !important;
-  text-transform: uppercase !important;
+    "Courier New", monospace;
+  font-size: 11px;
+  text-transform: uppercase;
 }
 
-/* 3. Style the hover state */
 .std-input li:hover,
 .std-input li:hover span {
-  background-color: #2dd4bf !important; /* teal-400 */
-  color: #000000 !important; /* Black text on hover for contrast */
+  background-color: #e5e7eb; /* zinc-200 */
+  color: #000000;
 }
 
-/* 4. Fix the search input inside the dropdown (if any) */
-/* .std-input input {
-  color: white !important;
-} */
+/* Search input inside dropdown */
 .stsearch-box input {
-  border: none !important;
-  color: white !important;
+  border: none;
+  color: #000000;
 }
+
+/* Optional container styling */
 .stdropdown-container {
-  border: 1px solid rgba(206, 206, 206, 0.082) !important;
-  border-radius: 12px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
 }
+
 .stdropdown-item {
-  color: black !important;
+  color: #000000;
+}
+
+/* CountrySelect dropdown — DARK */
+.dark .std-input ul {
+  background-color: #09090b; /* zinc-950 */
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .std-input li,
+.dark .std-input li span,
+.dark .std-input .city-dropdown li,
+.dark .std-input .country-dropdown li {
+  color: #ffffff;
+}
+
+.dark .std-input li:hover,
+.dark .std-input li:hover span {
+  background-color: #2dd4bf; /* teal */
+  color: #000000;
+}
+
+.dark .stsearch-box input {
+  color: #ffffff;
+}
+
+.dark .stdropdown-container {
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.dark .stdropdown-item {
+  color: #ffffff;
 }

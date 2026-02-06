@@ -89,7 +89,7 @@ const NocturneCalendar = ({
 
   return (
     <div className="relative w-full group" onClick={handleContainerClick}>
-      <div className="bg-black/60 border border-white/10 rounded-xl px-4 py-3 text-xs font-mono cursor-pointer flex justify-between items-center group-hover:border-teal-500 transition-colors">
+      <div className="bg-white border border-black/10 text-black dark:bg-black/60 dark:border-white/10 dark:text-white rounded-xl px-4 py-3 text-xs font-mono cursor-pointer flex justify-between items-center group-hover:border-teal-500 transition-colors">
         <span className={value ? "text-white" : "text-gray-500"}>
           {value ? value.replace(/-/g, ".") : "SELECT DATE"}
         </span>
@@ -205,28 +205,47 @@ export default function Home() {
     }
   };
   useEffect(() => {
-    if (stamps.length > 0) {
-      const minimalStamps = stamps.map((s) => ({
-        venue: s.venue,
-        city: s.city,
-        date: s.date,
-      }));
-
-      generateVanguardReport(minimalStamps).then(setIntelReport);
+    if (webPreview || galleryIndex !== null) {
+      document.body.style.overflow = "hidden";
+    } else {
+      document.body.style.overflow = "unset";
     }
-  }, [stamps]);
+  }, [webPreview, galleryIndex]);
+  // useEffect(() => {
+  //   if (stamps.length === 0) {
+  //     setIntelReport("");
+  //     return;
+  //   }
+  //   if (stamps.length > 0) {
+  //     const minimalStamps = stamps.map((s) => ({
+  //       venue: s.venue,
+  //       city: s.city,
+  //       date: s.date,
+  //     }));
+
+  //     generateVanguardReport(minimalStamps).then(setIntelReport);
+  //   }
+  // }, [stamps]);
 
   React.useEffect(() => {
+    if (stamps.length === 0) {
+      setIntel("");
+      return;
+    }
+
     const fetchIntel = async () => {
-      if (stamps.length > 0) {
-        const response = await fetch("/api/intel", {
-          method: "POST",
-          body: JSON.stringify({ venues: stamps.map((s) => s.venue) }),
-        });
-        const data = await response.json();
-        setIntel(data.report);
-      }
+      const response = await fetch("/api/intel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          venues: stamps.map((s) => s.venue),
+        }),
+      });
+
+      const data = await response.json();
+      setIntel(data.report);
     };
+
     fetchIntel();
   }, [stamps]);
 
@@ -237,9 +256,14 @@ export default function Home() {
   }, []);
 
   const totalDistance = useMemo(() => {
-    if (!stamps || stamps.length === 0) return 0;
+    // 1. Safety check: If no stamps, distance must be 0
+    if (!stamps || stamps.length < 2) return 0;
+
+    // 2. Log it to your console to see if it's actually running
+    console.log("Re-calculating distance for", stamps.length, "stamps");
+
     return calculateTotalTravel(stamps);
-  }, [stamps]);
+  }, [stamps]); // MUST have stamps here
 
   const toggleCityFilter = (country: string, city: string) => {
     setActiveCityFilters((prev) => {
@@ -723,7 +747,8 @@ export default function Home() {
   if (!mounted) return null;
 
   return (
-    <div className="flex min-h-screen bg-zinc-950 pb-32 px-4 md:px-0">
+    <div className="flex min-h-screen bg-white dark:bg-zinc-950 pb-32 px-4 md:px-0">
+      {" "}
       {/* SLIDE-OUT SIDEBAR */}
       {/* The Backdrop/Overlay - Only visible on mobile when sidebar is open */}
       {showSidebar && (
@@ -732,21 +757,12 @@ export default function Home() {
           onClick={() => setShowSidebar(false)}
         />
       )}
-
-      {/* Your Sidebar - Ensure it has a higher z-index than the backdrop */}
-      <aside className={`fixed lg:static z-50 ...`}>
-        {/* Sidebar Content */}
-      </aside>
       <aside
-        className={`fixed left-0 top-0 h-full z-9999 transition-all duration-500
-          /* Adaptive Background & Borders */
-          bg-transparent 
-          md:bg-purple-100 md:dark:bg-zinc-950 
-          md:border-r border-purple-300/50 dark:border-white/10
+        className={`fixed left-0 top-0 h-full z-9999 transition-all duration-500 bg-white/90 dark:bg-zinc-950/95 backdrop-blur-xl md:bg-purple-100 md:dark:bg-zinc-950 border-r border-black/10 dark:border-white/10 md:border-purple-300/50
           ${galleryIndex !== null ? "-translate-x-full" : ""} 
           ${
             showSidebar
-              ? "w-80 translate-x-0 bg-purple-100 dark:bg-zinc-950 shadow-2xl md:shadow-none"
+              ? "w-80 translate-x-0 shadow-2xl md:shadow-none"
               : "w-80 -translate-x-[calc(100%-64px)]"
           }`}
       >
@@ -757,13 +773,23 @@ export default function Home() {
             onClick={() => setShowSidebar(true)}
           >
             <div className="w-10 h-10 rounded-full bg-linear-to-tr from-teal-500 to-purple-600 p-0.5 shadow-lg">
-              <div className="w-full h-full rounded-full bg-black flex items-center justify-center overflow-hidden">
+              <div className="w-full h-full rounded-full bg-white dark:bg-black flex items-center justify-center overflow-hidden">
+                {/* Light theme logo */}
+                <Image
+                  src="/logo_light.png"
+                  alt="Profile"
+                  width={24}
+                  height={24}
+                  className="opacity-80 dark:hidden"
+                />
+
+                {/* Dark theme logo */}
                 <Image
                   src="/logo.png"
                   alt="Profile"
                   width={24}
                   height={24}
-                  className="opacity-80"
+                  className="opacity-80 hidden dark:block"
                 />
               </div>
             </div>
@@ -783,25 +809,26 @@ export default function Home() {
         >
           {/* Profile Header */}
           <div className="flex justify-between items-start mb-12">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-zinc-900 border border-white/10 p-2">
-                <Image
-                  src="/logo.png"
-                  alt="User"
-                  width={40}
-                  height={40}
-                  className="object-contain"
-                />
-              </div>
-              <div>
-                <p className="text-xs font-black italic uppercase tracking-widest text-purple-950 dark:text-white">
-                  {rank.title} Curator
-                </p>
-                <p className="text-[9px] font-mono text-purple-500/80 uppercase font-bold tracking-tight">
-                  Access Level {rank.level}
-                </p>
-              </div>
+            <div className="w-12 h-12 rounded-full bg-white dark:bg-zinc-900 border border-black/10 dark:border-white/10 p-2">
+              {/* Light theme logo */}
+              <Image
+                src="/logo_light.png"
+                alt="User"
+                width={40}
+                height={40}
+                className="object-contain dark:hidden"
+              />
+
+              {/* Dark theme logo */}
+              <Image
+                src="/logo.png"
+                alt="User"
+                width={40}
+                height={40}
+                className="object-contain hidden dark:block"
+              />
             </div>
+
             <button
               onClick={() => setShowSidebar(false)}
               className="text-zinc-600 hover:text-white transition-colors"
@@ -1116,7 +1143,7 @@ export default function Home() {
               </button>
             ) : (
               /* FIXED OVERLAY: This ensures the form is always visible in the center of the screen */
-              <div className="fixed inset-0 z-9999 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+              <div className="fixed inset-0 z-9999 flex items-center justify-center bg-white/70 dark:bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
                 <div className="w-full max-w-xl animate-in fade-in zoom-in duration-300 relative py-8">
                   {/* Close Button Container */}
                   <div className="flex justify-end mb-2 max-w-md mx-auto">
@@ -1129,7 +1156,7 @@ export default function Home() {
                         setDetectedCountry("");
                         setCountryKey((prev) => prev + 1);
                       }}
-                      className="text-[10px] font-mono opacity-50 hover:opacity-100 text-white bg-white/10 px-3 py-1 rounded-full"
+                      className="text-[10px] font-mono opacity-60 hover:opacity-100 bg-black/5 text-zinc-700 border border-black/10 dark:bg-white/10 dark:text-white dark:border-white/10 px-3 py-1 rounded-full"
                     >
                       CLOSE [X]
                     </button>
@@ -1141,7 +1168,7 @@ export default function Home() {
                     // action={formAction}
                     onSubmit={(e) => handleCreateStamp(e)}
                     /* Changed bg-white/3 to a solid dark color for better readability in the modal */
-                    className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-6 md:p-10 rounded-[2.5rem] bg-zinc-900/50 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
+                    className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-6 md:p-10 rounded-[2.5rem] bg-white/85 border border-black/10 dark:bg-zinc-900/50 dark:border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
                   >
                     <div className="flex flex-col gap-2">
                       <button
@@ -1178,7 +1205,7 @@ export default function Home() {
                                   countryInput.value = e.name.toUpperCase();
                               }}
                               placeHolder="SELECT COUNTRY"
-                              inputClassName="w-full rounded-xl px-4 py-[13px] text-xs font-mono uppercase bg-black/60 border border-white/20 text-white focus:border-teal-500 outline-none"
+                              inputClassName="w-full rounded-xl px-4 py-[13px] text-xs font-mono uppercase bg-white border border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/60 dark:border-white/20 dark:text-white focus:border-teal-500 outline-none"
                               containerClassName="border-none p-0 m-0 bg-transparent w-full"
                             />
                             <input
@@ -1198,7 +1225,7 @@ export default function Home() {
                             name="city"
                             placeholder="ENTER CITY"
                             required
-                            className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none bg-black/60 border border-white/10 text-white focus:border-teal-500 transition-all"
+                            className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none bg-white border border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/60 dark:border-white/10 dark:text-white focus:border-teal-500 transition-all"
                           />
                         </div>
                       </div>
@@ -1347,32 +1374,48 @@ export default function Home() {
                 </button>
               </div>
             )}
-            <div className="sticky top-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/5 px-6 py-4">
+            {/* UPDATED: Sticky header now supports light + dark mode */}
+            <div
+              className="
+    sticky top-0 z-50
+    bg-white/80 text-black border-b border-black/10
+    dark:bg-black/80 dark:text-white dark:border-white/5
+    backdrop-blur-md
+    px-6 py-4
+  "
+            >
               <div className="max-w-7xl mx-auto flex flex-col md:flex-row md:items-center justify-between gap-4 md:gap-0">
                 {/* LEFT: Passport Info & Mobile Issue Button */}
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col">
-                    <h1 className="text-xl font-bold tracking-tighter text-white uppercase flex items-center gap-2 ">
+                    <h1
+                      className="
+            text-xl font-bold tracking-tighter uppercase flex items-center gap-2
+            text-zinc-900 dark:text-white
+          "
+                    >
                       Passport
-                      {/* This small pulsing dot makes the "mobile connection" look real for your demo */}
-                      <span className="flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-teal-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
+                      {/* Pulse dot */}
+                      <span className="flex h-2 w-2 relative">
+                        <span className="animate-ping absolute inline-flex h-2 w-2 rounded-full bg-teal-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500" />
                       </span>
                     </h1>
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mr-2">
+
+                    <span className="text-[9px] font-mono uppercase tracking-widest mr-2 text-zinc-600 dark:text-zinc-500">
                       Digital Identity / {stamps.length} Logs
                     </span>
                   </div>
 
-                  {/* ISSUE BUTTON: Sticky Header Version (Always hidden on Map) */}
+                  {/* Mobile Issue Button */}
                   <button
                     onClick={() => setShowForm(true)}
-                    className={`flex md:hidden items-center gap-2 bg-teal-500 text-black px-3 py-1.5 rounded-full transition-all active:scale-95 ${
-                      view === "passport" && scrollY > 100
-                        ? "opacity-100"
-                        : "opacity-0 pointer-events-none"
-                    }`}
+                    className={`
+          flex md:hidden items-center gap-2
+          bg-teal-500 text-black px-3 py-1.5 rounded-full
+          transition-all active:scale-95
+          ${view === "passport" && scrollY > 100 ? "opacity-100" : "opacity-0 pointer-events-none"}
+        `}
                   >
                     <span className="text-[9px] font-black uppercase tracking-tighter">
                       + ISSUE
@@ -1380,12 +1423,14 @@ export default function Home() {
                   </button>
                 </div>
 
-                {/* RIGHT: Search & Export (Row on Desktop, New Row on Mobile) */}
-                <div className="flex items-center justify-between  gap-3 md:flex-1">
+                {/* RIGHT: Search & Export */}
+                <div className="flex items-center justify-between gap-3 md:flex-1">
                   {/* Search Toggle */}
                   {view !== "map" && (
                     <div
-                      className={`transition-all duration-300 flex items-center ${isSearchOpen ? "flex-1 md:flex-none md:w-60" : "w-auto"}`}
+                      className={`transition-all duration-300 flex items-center ${
+                        isSearchOpen ? "flex-1 md:flex-none md:w-60" : "w-auto"
+                      }`}
                     >
                       {isSearchOpen ? (
                         <div className="flex items-center gap-3 w-full relative">
@@ -1398,14 +1443,19 @@ export default function Home() {
                             onBlur={() =>
                               !searchQuery && setIsSearchOpen(false)
                             }
-                            className="w-full bg-zinc-900 border border-white/10 rounded-lg py-2 px-3 text-xs text-white focus:outline-none focus:border-teal-500"
+                            className="
+                  w-full rounded-lg py-2 px-3 text-xs
+                  bg-white border border-black/10 text-black
+                  dark:bg-zinc-900 dark:border-white/10 dark:text-white
+                  focus:outline-none focus:border-teal-500
+                "
                           />
                           <button
                             onClick={() => {
                               setSearchQuery("");
                               setIsSearchOpen(false);
                             }}
-                            className="absolute right-3 text-zinc-500"
+                            className="absolute right-3 text-zinc-500 dark:text-zinc-500"
                           >
                             ✕
                           </button>
@@ -1413,7 +1463,11 @@ export default function Home() {
                       ) : (
                         <button
                           onClick={() => setIsSearchOpen(true)}
-                          className="p-2 hover:bg-white/5 rounded-full border border-transparent hover:border-white/10 transition-all"
+                          className="
+                p-2 rounded-full transition-all
+                hover:bg-black/5 border border-transparent hover:border-black/10
+                dark:hover:bg-white/5 dark:hover:border-white/10
+              "
                         >
                           <svg
                             width="18"
@@ -1422,7 +1476,7 @@ export default function Home() {
                             fill="none"
                             stroke="currentColor"
                             strokeWidth="2"
-                            className="text-teal-500"
+                            className="text-teal-600 dark:text-teal-500"
                           >
                             <circle cx="11" cy="11" r="8" />
                             <line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -1432,14 +1486,15 @@ export default function Home() {
                     </div>
                   )}
 
-                  {/* Desktop Sticky Issue Button (Hidden on mobile) */}
+                  {/* Desktop Issue Button */}
                   <button
                     onClick={() => setShowForm(true)}
-                    className={`hidden md:flex items-center gap-2 bg-teal-500 hover:bg-teal-400 mx-4 text-black px-4 py-2 rounded-full transition-all shadow-[0_0_15px_rgba(45,212,191,0.2)] ${
-                      view === "passport" && scrollY > 100
-                        ? "opacity-100 scale-100"
-                        : "opacity-0 scale-90 pointer-events-none"
-                    }`}
+                    className={`
+          hidden md:flex items-center gap-2
+          bg-teal-500 hover:bg-teal-400 mx-4 text-black px-4 py-2 rounded-full
+          transition-all shadow-[0_0_15px_rgba(45,212,191,0.2)]
+          ${view === "passport" && scrollY > 100 ? "opacity-100 scale-100" : "opacity-0 scale-90 pointer-events-none"}
+        `}
                   >
                     <span className="text-[10px] font-black uppercase tracking-tighter">
                       + ISSUE NEW STAMP
@@ -1447,12 +1502,15 @@ export default function Home() {
                   </button>
 
                   {/* Export Button */}
-                  {/* 1. THE TRIGGER BUTTON (Cleaned up) */}
                   <button
                     onClick={onExportClick}
-                    className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-lg hover:bg-teal-500/10 hover:border-teal-500 transition-all group"
+                    className="
+          flex items-center gap-2 px-4 py-2 rounded-lg transition-all group
+          bg-black/5 border border-black/10 hover:bg-teal-500/10 hover:border-teal-500
+          dark:bg-white/5 dark:border-white/10 dark:hover:bg-teal-500/10 dark:hover:border-teal-500
+        "
                   >
-                    <span className="text-[10px] font-mono text-zinc-400 group-hover:text-teal-500">
+                    <span className="text-[10px] font-mono text-zinc-700 group-hover:text-teal-600 dark:text-zinc-400 dark:group-hover:text-teal-500">
                       EXPORT
                     </span>
                     <svg
@@ -1462,7 +1520,7 @@ export default function Home() {
                       fill="none"
                       stroke="currentColor"
                       strokeWidth="3"
-                      className="text-zinc-500 group-hover:text-teal-500"
+                      className="text-zinc-600 group-hover:text-teal-600 dark:text-zinc-500 dark:group-hover:text-teal-500"
                     >
                       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
                       <polyline points="16 6 12 2 8 6" />
@@ -1470,7 +1528,7 @@ export default function Home() {
                     </svg>
                   </button>
 
-                  {/* 2. THE HIDDEN CARD  */}
+                  {/* Hidden Card */}
                   <div
                     style={{ position: "absolute", left: "-9999px", top: "0" }}
                   >
@@ -1481,52 +1539,6 @@ export default function Home() {
                       />
                     </div>
                   </div>
-
-                  {/* 3. WEB ONLY PREVIEW MODAL (Moved outside the button) */}
-                  {webPreview && (
-                    <div
-                      className="fixed inset-0 z-99999 bg-black/95 flex flex-col items-center justify-center p-6 backdrop-blur-xl pointer-events-auto"
-                      onClick={() => setWebPreview(null)}
-                    >
-                      <div
-                        className="max-w-sm w-full bg-zinc-900 border border-white/10 p-5 rounded-[30px] shadow-2xl"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <p className="text-[#ff00ff] font-mono text-[9px] uppercase tracking-[0.3em] text-center mb-5">
-                          Passport Generated
-                        </p>
-
-                        <img
-                          src={webPreview}
-                          className="w-full rounded-[20px] border border-white/10 mb-6 shadow-glow"
-                          alt="Preview"
-                        />
-
-                        <div className="flex flex-col gap-3">
-                          <button
-                            onClick={async (e) => {
-                              e.stopPropagation();
-                              await downloadWebPassport(webPreview, stamps);
-                              setWebPreview(null);
-                            }}
-                            className="w-full bg-[#ff00ff] text-white font-black py-4 rounded-xl uppercase text-[10px] tracking-widest"
-                          >
-                            Download & Copy Summary
-                          </button>
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setWebPreview(null);
-                            }}
-                            className="w-full py-2 text-white/30 font-mono text-[9px] uppercase tracking-widest"
-                          >
-                            Discard
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>
@@ -1741,7 +1753,7 @@ export default function Home() {
 
           {/* MODAL & LIGHTBOX */}
           {selectedStamp && (
-            <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+            <div className="fixed inset-0 z-120 flex items-center justify-center p-4 bg-white/80 dark:bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
               <div className="w-full max-w-lg bg-zinc-900 border border-white/10 rounded-[40px] overflow-hidden shadow-2xl relative">
                 <button
                   onClick={() => {
@@ -1764,7 +1776,7 @@ export default function Home() {
 
                 {!isEditing ? (
                   <div className="flex flex-col">
-                    <div className="relative h-64 w-full bg-black overflow-hidden group/zoom">
+                    <div className="relative h-64 w-full overflow-hidden group/zoom bg-zinc-100 dark:bg-black">
                       {selectedStamp.image ? (
                         <>
                           <Image
@@ -1790,7 +1802,14 @@ export default function Home() {
                                 e.stopPropagation();
                                 setShowRedactConfirm(true);
                               }}
-                              className="absolute top-6 left-6 z-50 p-2.5 bg-zinc-900/80 hover:bg-red-600 backdrop-blur-md border border-white/10 rounded-full text-white/40 hover:text-white transition-all opacity-0 group-hover/zoom:opacity-100 flex items-center gap-2 pr-4 shadow-xl"
+                              className="
+                                absolute top-6 left-6 z-50 p-2.5 rounded-full
+                                backdrop-blur-md border shadow-xl
+                                transition-all opacity-0 group-hover/zoom:opacity-100
+                                flex items-center gap-2 pr-4
+                                bg-white/85 border-black/10 text-zinc-700 hover:text-white hover:bg-red-600
+                                dark:bg-zinc-900/80 dark:border-white/10 dark:text-white/40 dark:hover:text-white
+                              "
                             >
                               <svg
                                 width="14"
@@ -1809,8 +1828,11 @@ export default function Home() {
                           )}
 
                           {showRedactConfirm && (
-                            <div className="absolute inset-0 z-60 flex flex-col items-center justify-center bg-red-950/20 backdrop-blur-sm animate-in fade-in zoom-in duration-200">
-                              <p className="text-[10px] font-black text-white tracking-[0.3em] uppercase mb-4 drop-shadow-md">
+                            <div
+                              className="
+                                      absolute inset-0 z-60 flex flex-col items-center justify-centerbg-red-100/70 dark:bg-red-950/20 backdrop-blur-smanimate-in fade-in zoom-in duration-200"
+                            >
+                              <p className="text-[10px] font-black tracking-[0.3em] uppercase mb-4 drop-shadow-md text-red-900 dark:text-white">
                                 Confirm Redaction?
                               </p>
                               <div className="flex gap-3">
@@ -1825,7 +1847,7 @@ export default function Home() {
                                 </button>
                                 <button
                                   onClick={() => setShowRedactConfirm(false)}
-                                  className="px-6 py-2 bg-black/40 text-white/60 text-[9px] font-black uppercase rounded-full border border-white/10 hover:bg-white/10 transition-all"
+                                  className="px-6 py-2 text-[9px] font-black uppercase rounded-full transition-all bg-white text-zinc-700 border border-black/10 hover:bg-zinc-100 dark:bg-black/40 dark:text-white/60 dark:border-white/10 dark:hover:bg-white/10 "
                                 >
                                   Cancel
                                 </button>
@@ -1845,14 +1867,14 @@ export default function Home() {
                           />
                         </div>
                       )}
-                      <div className="absolute inset-0 bg-linear-to-t from-zinc-900 via-transparent to-transparent pointer-events-none"></div>
+                      <div className="absolute inset-0 bg-linear-to-t from-white via-transparent to-transparent dark:from-zinc-900 pointer-events-none"></div>
                     </div>
-                    <div className="p-10 -mt-12 relative z-10">
+                    <div className="p-10 -mt-12 relative z-10 bg-white/80 dark:bg-transparent backdrop-blur-sm rounded-b-[40px]">
                       <div className="flex items-center gap-3 mb-4">
                         <span className="px-3 py-1 bg-teal-500 text-black text-[9px] font-black rounded-full uppercase tracking-widest">
                           {selectedStamp.category || "GENERAL"}
                         </span>
-                        <span className="text-[10px] font-mono text-white/40">
+                        <span className="text-[10px] font-mono text-zinc-500 dark:text-white/40">
                           {selectedStamp.date.replace(/-/g, ".")}
                         </span>
                       </div>
@@ -1862,18 +1884,18 @@ export default function Home() {
                       >
                         {selectedStamp.venue}
                       </h2>
-                      <p className="text-sm font-mono text-white/60 mb-6 uppercase tracking-widest">
+                      <p className="text-sm font-mono text-zinc-600 dark:text-white/60 mb-6 uppercase tracking-widest">
                         {selectedStamp.city}, {selectedStamp.country}
                       </p>
-                      <div className="bg-white/5 border border-white/5 p-6 rounded-2xl mb-8">
-                        <p className="text-xs font-mono leading-relaxed text-white/80 italic">
+                      <div className="bg-black/5 border border-black/10 dark:bg-white/5 dark:border-white/10 p-6 rounded-2xl mb-8">
+                        <p className="text-xs font-mono leading-relaxed text-zinc-800 dark:text-white/80 italic">
                           &quot;{selectedStamp.activity}&quot;
                         </p>
                       </div>
                       <div className="flex gap-4">
                         <button
                           onClick={() => setIsEditing(true)}
-                          className="flex-1 py-4 bg-white text-black font-black rounded-2xl text-[10px] uppercase hover:bg-teal-400 transition-all"
+                          className="flex-1 py-4 rounded-2xl text-[10px] uppercase font-black transition-all bg-white text-black hover:bg-teal-400 hover:text-black dark:bg-white dark:text-black"
                         >
                           Edit Entry
                         </button>
@@ -1881,7 +1903,7 @@ export default function Home() {
                           onClick={() => {
                             setSelectedStamp(null);
                           }}
-                          className="px-8 py-4 border border-white/10 rounded-2xl text-[10px] font-black uppercase hover:bg-white/5 transition-all text-white/40"
+                          className=" px-8 py-4 rounded-2xl text-[10px] font-black uppercase transition-all border border-black/10 text-zinc-600 hover:bg-black/5 dark:border-white/10 dark:text-white/40 dark:hover:bg-white/5 "
                         >
                           Close
                         </button>
@@ -1893,7 +1915,7 @@ export default function Home() {
                     ref={editFormRef}
                     onSubmit={handleUpdate}
                     /* Changed max-w-md to max-w-4xl for laptop breathability */
-                    className="w-full max-w-4xl space-y-4 mx-auto relative z-10 p-4 md:p-10 rounded-3xl md:rounded-[2.5rem] bg-zinc-900/90 border border-white/10 shadow-2xl backdrop-blur-xl transition-all duration-500"
+                    className=" w-full max-w-4xl space-y-4 mx-auto relative z-10 p-4 md:p-10  rounded-3xl md:rounded-[2.5rem] shadow-2xl backdrop-blur-xl transition-all duration-500 bg-white/90 border border-black/10  dark:bg-zinc-900/90 dark:border-white/10"
                   >
                     {/* Header inside the form for better context */}
                     <div className="text-center md:text-left mb-4">
@@ -1912,19 +1934,19 @@ export default function Home() {
                             defaultValue={selectedStamp.city}
                             placeholder="CITY"
                             required
-                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-black/40 border-white/10 text-white focus:border-teal-500"
+                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/40 dark:border-white/10 dark:text-white dark:placeholder:text-white/40 focus:border-teal-500"
                           />
                           <input
                             name="country"
                             defaultValue={selectedStamp.country}
                             placeholder="COUNTRY"
                             required
-                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-black/40 border-white/10 text-white focus:border-teal-500"
+                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/40 dark:border-white/10 dark:text-white dark:placeholder:text-white/40 focus:border-teal-500"
                           />
                         </div>
 
                         <div className="flex flex-col gap-2">
-                          <label className="text-[10px] text-zinc-500 font-mono uppercase">
+                          <label className="text-[10px] text-zinc-600 dark:text-zinc-500 font-mono uppercase">
                             📍 Pin Location
                           </label>
                           <div className="rounded-2xl overflow-hidden h-50 md:h-62.5">
@@ -1956,7 +1978,7 @@ export default function Home() {
                           <select
                             name="category"
                             defaultValue={selectedStamp.category}
-                            className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border bg-black/40 border-white/10 text-white focus:border-teal-500 transition-all"
+                            className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-black/10 text-black dark:bg-black/40 dark:border-white/10 dark:text-white focus:border-teal-500"
                           >
                             <option value="">UNCATEGORIZED</option>
                             {CATEGORIES.map((c) => (
@@ -1976,7 +1998,7 @@ export default function Home() {
                           defaultValue={selectedStamp.activity}
                           rows={3}
                           placeholder="ACTIVITY"
-                          className="w-full rounded-xl px-4 py-3 text-xs font-mono outline-none border bg-black/40 border-white/10 text-white focus:border-teal-500 resize-none"
+                          className="w-full rounded-xl px-4 py-3 text-xs font-mono outline-none border resize-none bg-white border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/40 dark:border-white/10 dark:text-white dark:placeholder:text-white/40 focus:border-teal-500"
                         />
 
                         {/* File Upload remains similar but more compact */}
@@ -1991,7 +2013,11 @@ export default function Home() {
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                           />
                           <div
-                            className={`w-full border border-dashed rounded-xl py-3 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase transition-all ${editImageUploaded ? "border-teal-500 text-teal-500" : "border-white/10 text-white/40 bg-black/20"}`}
+                            className={`w-full border border-dashed rounded-xl py-3 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase transition-all ${
+                              editImageUploaded
+                                ? "border-teal-500 text-teal-600 dark:text-teal-500 bg-teal-500/5"
+                                : "border-black/10 text-zinc-600 bg-black/5 dark:border-white/10 dark:text-white/40 dark:bg-black/20"
+                            }`}
                           >
                             {editImageUploaded
                               ? "✓ Evidence Ready"
@@ -2002,7 +2028,7 @@ export default function Home() {
                     </div>
 
                     {/* FOOTER ACTIONS: Full width at the bottom */}
-                    <div className="flex gap-3 pt-4 border-t border-white/5">
+                    <div className="flex gap-3 pt-4 border-t border-black/10 dark:border-white/5">
                       <button
                         type="button"
                         onClick={() => setShowDeleteConfirm(selectedStamp.id)}
@@ -2031,7 +2057,7 @@ export default function Home() {
                           setIsEditing(false);
                           setSelectedStamp(null);
                         }}
-                        className="flex-1 py-4 text-[10px] font-black uppercase border border-white/10 rounded-2xl hover:bg-white/5 transition-colors text-white/60"
+                        className="flex-1 py-4 text-[10px] font-black uppercase rounded-2xl transition-colors border border-black/10 text-zinc-700 hover:bg-black/5 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/5"
                       >
                         Cancel
                       </button>
@@ -2044,7 +2070,7 @@ export default function Home() {
 
           {/* FULLSCREEN GALLERY LIGHTBOX */}
           {galleryIndex !== null && (
-            <div className="fixed inset-0 z-300 bg-black/98 backdrop-blur-2xl flex items-center justify-center animate-in fade-in duration-300">
+            <div className="fixed inset-0 z-300 bg-white/90 dark:bg-black/98 backdrop-blur-2xl flex items-center justify-center animate-in fade-in duration-300">
               {/* Navigation HUD */}
               <button
                 onClick={() => setGalleryIndex(null)}
@@ -2115,16 +2141,16 @@ export default function Home() {
                 <p className="text-teal-500 font-mono text-[10px] tracking-[0.5em] uppercase mb-2">
                   Evidence Log #{galleryIndex + 1}
                 </p>
-                <h3 className="text-4xl font-black italic uppercase text-white tracking-tighter">
+                <h3 className="text-4xl font-black italic uppercase text-zinc-900 dark:text-white tracking-tighter">
                   {stamps[galleryIndex]?.venue}
                 </h3>
-                <p className="text-white/40 font-mono text-xs uppercase">
+                <p className="text-zinc-600 dark:text-white/40 font-mono text-xs uppercase">
                   {stamps[galleryIndex]?.city}
                   {stamps[galleryIndex]?.date.replace(/-/g, ".")}
                 </p>
               </div>
 
-              <div className="absolute bottom-12 right-12 text-white/10 font-mono text-[10px] uppercase">
+              <div className="absolute bottom-12 right-12 text-zinc-500 dark:text-white/10 font-mono text-[10px] uppercase">
                 {galleryIndex + 1} / {stamps.length}
               </div>
             </div>
@@ -2143,6 +2169,10 @@ export default function Home() {
                   <button
                     onClick={async () => {
                       await deleteDoc(doc(db, "stamps", showDeleteConfirm));
+                      setStamps((prev) =>
+                        prev.filter((s) => s.id !== showDeleteConfirm),
+                      );
+
                       setShowDeleteConfirm(null);
                       setSelectedStamp(null);
                       setShowForm(false);
@@ -2219,10 +2249,57 @@ export default function Home() {
         </div>
       </main>
       {view !== "map" && <ScrollToTop />}
-
       <div style={{ position: "absolute", left: "-9999px", top: "0" }}>
         <PassportShareCard stamps={stamps} intelligenceReport={intelReport} />
       </div>
+      {/* 3. WEB ONLY PREVIEW MODAL (Moved outside the button) */}
+      {webPreview && (
+        <div
+          className="fixed inset-0 z-99999 bg-white/80 text-black dark:bg-black/95 dark:text-white flex flex-col items-center justify-center p-6 backdrop-blur-xl pointer-events-auto"
+          onClick={() => setWebPreview(null)}
+        >
+          <div
+            className="relative z-10000 max-w-sm w-full bg-white border border-black/10 dark:bg-zinc-900 dark:border-white/10 p-6 rounded-[30px] shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p className="text-[#ff00ff] font-mono text-[9px] uppercase tracking-[0.3em] text-center mb-5">
+              Passport Generated
+            </p>
+
+            <Image
+              src={webPreview}
+              alt="Preview"
+              width={600}
+              height={800}
+              unoptimized
+              className="w-full rounded-[20px] border border-black/10 dark:border-white/10 mb-6 shadow-glow"
+            />
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={async (e) => {
+                  e.stopPropagation();
+                  await downloadWebPassport(webPreview, stamps);
+                  setWebPreview(null);
+                }}
+                className="w-full bg-[#ff00ff] text-white font-black py-4 rounded-xl uppercase text-[10px] tracking-widest"
+              >
+                Download & Copy Summary
+              </button>
+
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setWebPreview(null);
+                }}
+                className="w-full py-2 font-mono text-[9px] uppercase tracking-widest text-zinc-600 hover:text-zinc-900 dark:text-white/30 dark:hover:text-white/60 transition-colors"
+              >
+                Discard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
