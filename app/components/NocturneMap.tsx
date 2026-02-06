@@ -150,7 +150,27 @@ export default function NocturneMap({
       }
     >,
   );
-
+  function CustomZoomControls() {
+    const map = useMap();
+    return (
+      <div className="absolute bottom-6 right-6 z-[1000] flex flex-col gap-3">
+        <button
+          type="button"
+          onClick={() => map.zoomIn()}
+          className="w-12 h-12 bg-black/90 border border-white/20 text-teal-400 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-2xl backdrop-blur-md active:scale-90 transition-all border-b-4 border-b-teal-500/30"
+        >
+          +
+        </button>
+        <button
+          type="button"
+          onClick={() => map.zoomOut()}
+          className="w-12 h-12 bg-black/90 border border-white/20 text-teal-400 rounded-2xl flex items-center justify-center font-bold text-2xl shadow-2xl backdrop-blur-md active:scale-90 transition-all border-b-4 border-b-teal-500/30"
+        >
+          −
+        </button>
+      </div>
+    );
+  }
   return (
     <div className="h-125 w-full rounded-[40px] overflow-hidden border border-white/10 relative shadow-2xl">
       <MapContainer
@@ -159,6 +179,7 @@ export default function NocturneMap({
         style={{ height: "100%", width: "100%", background: "#050505" }}
         zoomControl={false}
       >
+        <CustomZoomControls />
         <TileLayer url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png" />
 
         {/* 🚀 Recenter map when GPS fixes */}

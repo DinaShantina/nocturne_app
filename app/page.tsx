@@ -177,7 +177,7 @@ export default function Home() {
   } | null>(null);
   const [isDnaOpen, setIsDnaOpen] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
-  const [, setTempCoords] = useState<{
+  const [tempCoords, setTempCoords] = useState<{
     lat: number;
     lng: number;
   } | null>(null);
@@ -424,9 +424,12 @@ export default function Home() {
 
     // 1. Define 'f' FIRST so you can use it
     const f = new FormData(e.currentTarget);
-    const manualLat = parseFloat(f.get("lat") as string);
-    const manualLng = parseFloat(f.get("lng") as string);
-    // 2. Now you can safely normalize the country
+    const manualLat = tempCoords
+      ? tempCoords.lat
+      : parseFloat(f.get("lat") as string) || selectedStamp.lat;
+    const manualLng = tempCoords
+      ? tempCoords.lng
+      : parseFloat(f.get("lng") as string) || selectedStamp.lng;
     const rawCountry = String(f.get("country") || "");
     const finalCountry = normalizeCountryName(rawCountry).toUpperCase();
 
@@ -661,6 +664,18 @@ export default function Home() {
   return (
     <div className="flex min-h-screen bg-zinc-950 pb-32 px-4 md:px-0">
       {/* SLIDE-OUT SIDEBAR */}
+      {/* The Backdrop/Overlay - Only visible on mobile when sidebar is open */}
+      {showSidebar && (
+        <div
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setShowSidebar(false)}
+        />
+      )}
+
+      {/* Your Sidebar - Ensure it has a higher z-index than the backdrop */}
+      <aside className={`fixed lg:static z-50 ...`}>
+        {/* Sidebar Content */}
+      </aside>
       <aside
         className={`fixed left-0 top-0 h-full z-9999 transition-all duration-500
           /* Adaptive Background & Borders */
@@ -2042,7 +2057,8 @@ export default function Home() {
           )}
         </div>
       </main>
-      <ScrollToTop />
+      {view !== "map" && <ScrollToTop />}
+
       <div style={{ position: "absolute", left: "-9999px", top: "0" }}>
         <PassportShareCard stamps={stamps} />
       </div>
