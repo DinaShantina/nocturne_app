@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
@@ -35,10 +36,14 @@ import {
   getRank,
   getRankData,
   handleSharePassport,
+  downloadWebPassport,
 } from "@/lib/utils";
 import { CATEGORIES, GENRE_COLORS } from "@/lib/constants";
 import PassportShareCard from "./components/PassportShareCardProps";
-
+import { generateVanguardReport } from "@/lib/gemini";
+import { CountrySelect } from "react-country-state-city";
+import "react-country-state-city/dist/react-country-state-city.css";
+import { GetCountries } from "react-country-state-city";
 const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
   ssr: false,
   loading: () => (
@@ -106,7 +111,7 @@ const NocturneCalendar = ({
       <input
         ref={inputRef}
         type="date"
-        className="absolute inset-0 w-full h-full opacity-0 absolute z-0"
+        className="absolute inset-0 w-full h-full opacity-0 z-0"
         style={{ WebkitAppearance: "none" }}
         value={value}
         onChange={(e) => onChange(e.target.value)}
@@ -137,7 +142,6 @@ interface Stamp {
 }
 
 export default function Home() {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [formAction] = useActionState(submitEvent, null);
   const [stamps, setStamps] = useState<Stamp[]>([]);
   const [mounted, setMounted] = useState(false);
@@ -186,6 +190,46 @@ export default function Home() {
   const [scrollY, setScrollY] = React.useState(0);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [intel, setIntel] = React.useState("");
+  const [intelReport, setIntelReport] = useState("");
+  const [detectedCountry, setDetectedCountry] = useState<any>(null);
+  const [countryKey, setCountryKey] = useState(0);
+  const [webPreview, setWebPreview] = useState<string | null>(null);
+
+  const onExportClick = async () => {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const result = await handleSharePassport(stamps);
+
+    if (result) {
+      setWebPreview(result);
+    }
+  };
+  useEffect(() => {
+    if (stamps.length > 0) {
+      const minimalStamps = stamps.map((s) => ({
+        venue: s.venue,
+        city: s.city,
+        date: s.date,
+      }));
+
+      generateVanguardReport(minimalStamps).then(setIntelReport);
+    }
+  }, [stamps]);
+
+  React.useEffect(() => {
+    const fetchIntel = async () => {
+      if (stamps.length > 0) {
+        const response = await fetch("/api/intel", {
+          method: "POST",
+          body: JSON.stringify({ venues: stamps.map((s) => s.venue) }),
+        });
+        const data = await response.json();
+        setIntel(data.report);
+      }
+    };
+    fetchIntel();
+  }, [stamps]);
 
   React.useEffect(() => {
     const handleScroll = () => setScrollY(window.scrollY);
@@ -222,25 +266,38 @@ export default function Home() {
 
     const options = {
       enableHighAccuracy: true,
-      timeout: 10000, // 10 seconds
+      timeout: 10000,
       maximumAge: 0,
     };
 
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const { latitude, longitude } = position.coords;
-
-        // 1. SAVE RAW COORDS IMMEDIATELY
         setDetectedCoords({ lat: latitude, lng: longitude });
+
         try {
           const res = await fetch(
             `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${latitude}&longitude=${longitude}&localityLanguage=en`,
           );
           const data = await res.json();
+          const cleanName = normalizeCountryName(
+            data.countryName || "",
+          ).toUpperCase();
+
+          // 🚀 FIND THE COUNTRY OBJECT (For Flag + White Text)
+          const allCountries = await GetCountries();
+          const matched = allCountries.find(
+            (c: any) =>
+              c.name.toUpperCase() === cleanName ||
+              c.name.toUpperCase().includes(cleanName),
+          );
+
+          if (matched) {
+            setDetectedCountry(matched); // Sets the Object
+            setCountryKey((prev) => prev + 1); // Triggers UI Refresh
+          }
 
           const form = formRef.current;
-          const cleanCountry = normalizeCountryName(data.countryName || "");
-
           if (form) {
             const cityInput = form.querySelector(
               'input[name="city"]',
@@ -249,16 +306,15 @@ export default function Home() {
               'input[name="country"]',
             ) as HTMLInputElement;
 
-            if (cityInput)
+            if (cityInput) {
               cityInput.value = (
                 data.city ||
                 data.locality ||
                 ""
               ).toUpperCase();
+            }
             if (countryInput) {
-              countryInput.value = normalizeCountryName(
-                data.countryName || "",
-              ).toUpperCase();
+              countryInput.value = cleanName;
             }
           }
         } catch (error) {
@@ -269,20 +325,7 @@ export default function Home() {
       },
       (error) => {
         setIsLocating(false);
-        // Helpful error messages for iPhone users
-        switch (error.code) {
-          case error.PERMISSION_DENIED:
-            alert(
-              "Please enable Location Access in your iPhone Settings for Safari.",
-            );
-            break;
-          case error.POSITION_UNAVAILABLE:
-            alert("Location information is unavailable.");
-            break;
-          case error.TIMEOUT:
-            alert("Location request timed out.");
-            break;
-        }
+        alert("Location Error: " + error.message);
       },
       options,
     );
@@ -292,10 +335,23 @@ export default function Home() {
     setMounted(true);
     const q = query(collection(db, "stamps"), orderBy("createdAt", "desc"));
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const list = snapshot.docs.map((doc) => ({
-        id: doc.id,
-        ...doc.data(),
-      })) as Stamp[];
+      const list = snapshot.docs.map((doc) => {
+        const data = doc.data();
+
+        // FIX: If 'date' is missing in Firestore, convert 'createdAt' to a string
+        let finalDate = data.date;
+        if (!finalDate && data.createdAt) {
+          finalDate = new Date(data.createdAt.seconds * 1000)
+            .toISOString()
+            .split("T")[0];
+        }
+
+        return {
+          id: doc.id,
+          ...data,
+          date: finalDate || new Date().toISOString().split("T")[0], // Last resort fallback
+        };
+      }) as Stamp[];
       setStamps(list);
     });
     return () => unsubscribe();
@@ -373,12 +429,21 @@ export default function Home() {
       }
 
       // NEW: If we still have 0,0, try the hardcoded city fallback from utils
-      if (lat === 0 && lng === 0) {
-        const [fallbackLng, fallbackLat] = getValidCoordinates({
-          city: rawCity,
-        });
-        lat = fallbackLat;
-        lng = fallbackLng;
+      // 🚀 THE MAP FIX: Fetch real coordinates for the city
+      if (lat === 0 && lng === 0 && rawCity) {
+        try {
+          const geoResponse = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(rawCity)},${encodeURIComponent(finalCountry)}`,
+          );
+          const geoData = await geoResponse.json();
+          if (geoData && geoData.length > 0) {
+            lat = parseFloat(geoData[0].lat);
+            lng = parseFloat(geoData[0].lon);
+            console.log(`📍 Map Fixed: Found ${rawCity} at ${lat}, ${lng}`);
+          }
+        } catch (err) {
+          console.warn("Could not find city coordinates on the map", err);
+        }
       }
 
       // 4. Save to Firestore
@@ -607,9 +672,6 @@ export default function Home() {
     return () => window.removeEventListener("scroll", checkScroll);
   }, []);
 
-  const scrollToTop = () => {
-    window.scrollTo({ top: 0, behavior: "smooth" });
-  };
   const stats = CATEGORIES.map((cat) => {
     const count = stamps.filter((s) => s.category === cat).length;
     const percentage = stamps.length > 0 ? (count / stamps.length) * 100 : 0;
@@ -1060,7 +1122,14 @@ export default function Home() {
                   {/* Close Button Container */}
                   <div className="flex justify-end mb-2 max-w-md mx-auto">
                     <button
-                      onClick={() => setShowForm(false)}
+                      onClick={() => {
+                        setShowForm(false);
+                        setSearchQuery("");
+                        setIsSearchOpen(false);
+                        setDetectedCoords(null);
+                        setDetectedCountry("");
+                        setCountryKey((prev) => prev + 1);
+                      }}
                       className="text-[10px] font-mono opacity-50 hover:opacity-100 text-white bg-white/10 px-3 py-1 rounded-full"
                     >
                       CLOSE [X]
@@ -1091,22 +1160,48 @@ export default function Home() {
                       </button>
 
                       <div className="grid grid-cols-2 gap-4">
-                        <input
-                          name="city"
-                          placeholder="CITY"
-                          required
-                          className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border
-                      bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
-                      dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
-                        />
-                        <input
-                          name="country"
-                          placeholder="COUNTRY"
-                          required
-                          className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border
-                      bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
-                      dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
-                        />
+                        {/* 1. COUNTRY SELECT (With Spelling Safety) */}
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-mono text-zinc-500 uppercase ml-2">
+                            Verification Required
+                          </p>
+                          <div className="std-input w-full">
+                            <CountrySelect
+                              key={countryKey}
+                              defaultValue={detectedCountry} // 🚀 THE KEY TO BRIGHT WHITE TEXT
+                              onChange={(e: any) => {
+                                setDetectedCountry(e);
+                                const countryInput =
+                                  formRef.current?.querySelector(
+                                    'input[name="country"]',
+                                  ) as HTMLInputElement;
+                                if (countryInput)
+                                  countryInput.value = e.name.toUpperCase();
+                              }}
+                              placeHolder="SELECT COUNTRY"
+                              inputClassName="w-full rounded-xl px-4 py-[13px] text-xs font-mono uppercase bg-black/60 border border-white/20 text-white focus:border-teal-500 outline-none"
+                              containerClassName="border-none p-0 m-0 bg-transparent w-full"
+                            />
+                            <input
+                              type="hidden"
+                              name="country"
+                              value={detectedCountry?.name?.toUpperCase() || ""}
+                            />
+                          </div>
+                        </div>
+
+                        {/* 2. CITY INPUT (Total Freedom) */}
+                        <div className="space-y-1">
+                          <p className="text-[8px] font-mono text-zinc-500 uppercase ml-2">
+                            Manual Entry
+                          </p>
+                          <input
+                            name="city"
+                            placeholder="ENTER CITY"
+                            required
+                            className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none bg-black/60 border border-white/10 text-white focus:border-teal-500 transition-all"
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -1258,7 +1353,7 @@ export default function Home() {
                 {/* LEFT: Passport Info & Mobile Issue Button */}
                 <div className="flex justify-between items-center">
                   <div className="flex flex-col">
-                    <h1 className="text-xl font-bold tracking-tighter text-white uppercase flex items-center gap-2">
+                    <h1 className="text-xl font-bold tracking-tighter text-white uppercase flex items-center gap-2 ">
                       Passport
                       {/* This small pulsing dot makes the "mobile connection" look real for your demo */}
                       <span className="flex h-2 w-2">
@@ -1266,7 +1361,7 @@ export default function Home() {
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-teal-500"></span>
                       </span>
                     </h1>
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest mr-2">
                       Digital Identity / {stamps.length} Logs
                     </span>
                   </div>
@@ -1287,7 +1382,7 @@ export default function Home() {
                 </div>
 
                 {/* RIGHT: Search & Export (Row on Desktop, New Row on Mobile) */}
-                <div className="flex items-center justify-between md:justify-end gap-3 md:flex-1">
+                <div className="flex items-center justify-between  gap-3 md:flex-1">
                   {/* Search Toggle */}
                   {view !== "map" && (
                     <div
@@ -1353,8 +1448,9 @@ export default function Home() {
                   </button>
 
                   {/* Export Button */}
+                  {/* 1. THE TRIGGER BUTTON (Cleaned up) */}
                   <button
-                    onClick={() => handleSharePassport(stamps)}
+                    onClick={onExportClick}
                     className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-lg hover:bg-teal-500/10 hover:border-teal-500 transition-all group"
                   >
                     <span className="text-[10px] font-mono text-zinc-400 group-hover:text-teal-500">
@@ -1374,6 +1470,58 @@ export default function Home() {
                       <line x1="12" y1="2" x2="12" y2="15" />
                     </svg>
                   </button>
+
+                  {/* 2. THE HIDDEN CARD (Moved outside the button) */}
+                  <div
+                    style={{ position: "absolute", left: "-9999px", top: "0" }}
+                  >
+                    <div id="passport-share-card">
+                      <PassportShareCard
+                        stamps={stamps}
+                        intelligenceReport={intelReport}
+                      />
+                    </div>
+                  </div>
+
+                  {/* 3. WEB ONLY PREVIEW MODAL (Moved outside the button) */}
+                  {webPreview && (
+                    <div className="fixed inset-0 z-10000 bg-black/95 flex flex-col items-center justify-center p-6 backdrop-blur-xl">
+                      <div className="max-w-sm w-full bg-zinc-900 border border-white/10 p-5 rounded-[30px] shadow-2xl">
+                        <p className="text-[#ff00ff] font-mono text-[9px] uppercase tracking-[0.3em] text-center mb-5">
+                          Passport Generated
+                        </p>
+
+                        <img
+                          src={webPreview}
+                          className="w-full rounded-[20px] border border-white/10 mb-6 shadow-glow"
+                          alt="Preview"
+                        />
+
+                        <div className="flex flex-col gap-3">
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation(); // Prevents clicking "through" the modal
+                              await downloadWebPassport(webPreview, stamps);
+                              setWebPreview(null); // This will now close correctly
+                            }}
+                            className="w-full bg-[#ff00ff] text-white font-black py-4 rounded-xl uppercase text-[10px] tracking-widest"
+                          >
+                            Download & Copy Summary
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setWebPreview(null);
+                            }}
+                            className="w-full py-2 text-white/30 font-mono text-[9px] uppercase tracking-widest"
+                          >
+                            Discard
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -1725,7 +1873,9 @@ export default function Home() {
                           Edit Entry
                         </button>
                         <button
-                          onClick={() => setSelectedStamp(null)}
+                          onClick={() => {
+                            setSelectedStamp(null);
+                          }}
                           className="px-8 py-4 border border-white/10 rounded-2xl text-[10px] font-black uppercase hover:bg-white/5 transition-all text-white/40"
                         >
                           Close
@@ -1990,6 +2140,8 @@ export default function Home() {
                       await deleteDoc(doc(db, "stamps", showDeleteConfirm));
                       setShowDeleteConfirm(null);
                       setSelectedStamp(null);
+                      setShowForm(false);
+                      setIsEditing(false);
                     }}
                     className="w-full py-4 bg-red-500 text-white font-black rounded-2xl text-[10px] uppercase"
                   >
@@ -2006,7 +2158,7 @@ export default function Home() {
             </div>
           )}
           {!selectedStamp && !isEditing && !showForm && (
-            <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-[9999] animate-in fade-in slide-in-from-bottom-4 duration-300">
+            <nav className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-white/5 backdrop-blur-2xl border border-white/10 px-10 py-5 rounded-full flex gap-12 z-9999 animate-in fade-in slide-in-from-bottom-4 duration-300">
               <button
                 onClick={() => setShowSidebar(!showSidebar)}
                 className={`flex items-center gap-2 px-4 py-2 transition-all active:scale-95 rounded-full border
@@ -2060,7 +2212,7 @@ export default function Home() {
       {view !== "map" && <ScrollToTop />}
 
       <div style={{ position: "absolute", left: "-9999px", top: "0" }}>
-        <PassportShareCard stamps={stamps} />
+        <PassportShareCard stamps={stamps} intelligenceReport={intelReport} />
       </div>
     </div>
   );

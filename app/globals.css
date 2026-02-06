@@ -109,3 +109,54 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
+
+/* Force the dropdown list to be visible and correctly colored */
+.std-input {
+  position: relative;
+  z-index: 9999 !important;
+  color: #000000 !important;
+}
+
+/* 1. Target the dropdown container */
+.std-input ul {
+  background-color: #09090b !important; /* zinc-950 */
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  z-index: 9999 !important;
+}
+
+/* 2. THE MAIN FIX: Force the list item text color */
+.std-input li,
+.std-input li span,
+.std-input .city-dropdown li,
+.std-input .country-dropdown li {
+  color: #ffffff !important; /* Force text to white */
+  background-color: transparent !important;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+}
+
+/* 3. Style the hover state */
+.std-input li:hover,
+.std-input li:hover span {
+  background-color: #2dd4bf !important; /* teal-400 */
+  color: #000000 !important; /* Black text on hover for contrast */
+}
+
+/* 4. Fix the search input inside the dropdown (if any) */
+/* .std-input input {
+  color: white !important;
+} */
+.stsearch-box input {
+  border: none !important;
+  color: white !important;
+}
+.stdropdown-container {
+  border: 1px solid rgba(206, 206, 206, 0.082) !important;
+  border-radius: 12px !important;
+}
+.stdropdown-item {
+  color: black !important;
+}

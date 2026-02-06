@@ -1,8 +1,11 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // lib/utils.ts
 import { COUNTRY_MAPPINGS } from "./constants";
-import { toJpeg } from "html-to-image";
+// import { toJpeg } from "html-to-image";
 import { Share } from "@capacitor/share";
 import { Filesystem, Directory } from "@capacitor/filesystem";
+import { Capacitor } from "@capacitor/core";
+import { toPng } from "html-to-image";
 
 export const normalizeCountryName = (name: string): string => {
   if (!name) return "";
@@ -28,7 +31,6 @@ export const normalizeCountryName = (name: string): string => {
   return upperName;
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const getValidCoordinates = (stamp: any): [number, number] => {
   // If GPS gave us something real (not exactly 0)
   if (stamp.lat !== 0 && stamp.lng !== 0 && stamp.lat && stamp.lng) {
@@ -71,49 +73,63 @@ export const getRankData = (count: number) => {
   return { title: "Initiate", level: "I", color: "text-zinc-500" };
 };
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const handleSharePassport = async (stamps: any[]) => {
   const node = document.getElementById("passport-share-card");
-  if (!node) return;
+  if (!node) return null;
 
   try {
-    // 1. Generate the Image
-    const dataUrl = await toJpeg(node, {
-      quality: 0.95,
+    // 1. Force a clean style recalculation
+    node.style.display = "flex";
+
+    // 2. Wait longer for Android hardware acceleration (300ms)
+    await new Promise((resolve) => setTimeout(resolve, 300));
+
+    // 3. Switch to PNG (Much better for SVG/Text on Android)
+    const dataUrl = await toPng(node, {
+      cacheBust: true,
+      pixelRatio: 2, // Makes it sharp
       backgroundColor: "#000000",
-      cacheBust: true, // Prevents old images from sticking around
     });
 
-    // 2. Convert DataURL to a physical file in the phone's temporary storage
-    const fileName = `nocturne-passport-${Date.now()}.jpg`;
-    const base64Data = dataUrl.split(",")[1]; // Remove the "data:image/jpeg;base64," part
+    const isApp = Capacitor.isNativePlatform();
 
-    const savedFile = await Filesystem.writeFile({
-      path: fileName,
-      data: base64Data,
-      directory: Directory.Cache,
-    });
+    if (isApp) {
+      const shareText = `🌐 NOCTURNE PASSPORT\nTotal Logs: ${stamps.length}`;
+      const fileName = `nocturne-${Date.now()}.png`;
+      const base64Data = dataUrl.split(",")[1];
 
-    // 3. Prepare the summary text
-    const shareText =
-      `🌐 NOCTURNE PASSPORT EXPORT\n` +
-      `Rank: VANGUARD\n` +
-      `Total Logs: ${stamps.length}\n` +
-      `Latest: ${stamps[0]?.venue} | ${stamps[0]?.city}`;
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-    `--------------------------\n` +
-      `Join the network: nocturne.app\n` +
-      `#NocturneProtocol #Vanguard`;
+      await Filesystem.writeFile({
+        path: fileName,
+        data: base64Data,
+        directory: Directory.Cache,
+      });
 
-    // 4. 🔥 Open the Native Android Share Drawer
-    await Share.share({
-      title: "My Nocturne Passport",
-      text: shareText, // Now this will include the "Join the network" line!
-      url: savedFile.uri,
-      dialogTitle: "Export Passport Card",
-    });
+      const fileUri = await Filesystem.getUri({
+        path: fileName,
+        directory: Directory.Cache,
+      });
+
+      await Share.share({
+        title: "Nocturne Passport",
+        text: shareText,
+        url: fileUri.uri,
+      });
+      return null;
+    }
+    return dataUrl;
   } catch (err) {
-    console.error("Export failed:", err);
-    alert("Could not generate export card.");
+    console.error("Android Export Bug:", err);
+    return null;
   }
+};
+// This function is for the "Download" button inside the Web Modal
+export const downloadWebPassport = async (dataUrl: string, stamps: any[]) => {
+  const shareText = `🌐 NOCTURNE PASSPORT EXPORT\nTotal Logs: ${stamps.length}\nLatest: ${stamps[0]?.venue} | ${stamps[0]?.city}\n--------------------------\nnocturne.app`;
+
+  const link = document.createElement("a");
+  link.download = `nocturne-passport-${Date.now()}.jpg`;
+  link.href = dataUrl;
+  link.click();
+
+  await navigator.clipboard.writeText(shareText);
 };

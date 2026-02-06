@@ -107,6 +107,7 @@ export default function NocturneMap({
             { enableHighAccuracy: true },
           );
         }
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (error) {
         // Final fallback if the above fails
         navigator.geolocation.getCurrentPosition(
@@ -153,7 +154,7 @@ export default function NocturneMap({
   function CustomZoomControls() {
     const map = useMap();
     return (
-      <div className="absolute bottom-6 right-6 z-[1000] flex flex-col gap-3">
+      <div className="absolute bottom-6 right-6 z-1000 flex flex-col gap-3">
         <button
           type="button"
           onClick={() => map.zoomIn()}
