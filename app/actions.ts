@@ -1,7 +1,13 @@
 // actions.ts
 "use client";
+import { generateVanguardReport } from "@/lib/gemini";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function getVanguardReportAction(stamps: any[]) {
+  // This runs on the server, so it CAN see process.env.GEMINI_API_KEY
+  return await generateVanguardReport(stamps);
+}
 export type FormState = {
   success: boolean;
   message: string;

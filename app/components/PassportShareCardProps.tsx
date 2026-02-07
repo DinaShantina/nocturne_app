@@ -3,6 +3,8 @@
 "use client";
 
 import React, { useMemo } from "react";
+import { useEffect, useState } from "react";
+import { getVanguardReportAction } from "@/app/actions"; // Import the bridge
 
 interface Stamp {
   venue: string;
@@ -26,7 +28,17 @@ const PassportShareCard = ({
     () => `#NC-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
     [],
   );
+  const [report, setReport] = useState("SYNCING WITH COMMAND...");
 
+  useEffect(() => {
+    const getReport = async () => {
+      if (stamps.length > 0) {
+        const text = await getVanguardReportAction(stamps);
+        setReport(text);
+      }
+    };
+    getReport();
+  }, [stamps]);
   return (
     <div className="relative w-[420px] h-[820px] bg-white text-zinc-700 dark:bg-black dark:text-zinc-400 p-8 flex flex-col overflow-hidden rounded-[30px] border border-black/10 dark:border-white/10 shadow-[0_0_50px_rgba(0,0,0,0.1)] dark:shadow-[0_0_50px_rgba(0,0,0,1)]">
       {/* 1. CYBER SCAN LINES BACKGROUND (Dark Mode Only) */}
@@ -154,7 +166,7 @@ const PassportShareCard = ({
           </p>
         </div>
         <p className="text-[12px] leading-tight text-zinc-800 dark:text-white font-mono italic">
-          &quot;{intelligenceReport || "Initiating pattern decryption..."}&quot;
+          &quot;{report}&quot;
         </p>
       </div>
 
