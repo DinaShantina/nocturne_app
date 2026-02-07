@@ -762,6 +762,21 @@ export default function Home() {
       console.error("Cleanup Error:", err);
     }
   };
+  // NEW: filter helpers for UI visibility
+  const activeCityFiltersCount = useMemo(() => {
+    return Object.values(activeCityFilters).reduce(
+      (sum, cities) => sum + (cities?.length || 0),
+      0,
+    );
+  }, [activeCityFilters]);
+
+  const hasAnyFilterActive = useMemo(() => {
+    return (
+      filter !== "ALL" ||
+      searchQuery.trim().length > 0 ||
+      activeCityFiltersCount > 0
+    );
+  }, [filter, searchQuery, activeCityFiltersCount]);
 
   if (!mounted) return null;
 
@@ -960,7 +975,7 @@ export default function Home() {
                 <div className="space-y-3 mt-2 animate-in fade-in slide-in-from-top-1 duration-300">
                   {stats.map((stat) => (
                     <div key={stat.label} className="group">
-                      <div className="flex justify-between items-end mb-1">
+                      <div className="flex items-start md:items-end justify-between w-full border-b border-purple-200/20 dark:border-white/5 pb-4 md:pb-6">
                         <span className="text-[9px] font-mono text-purple-900/60 dark:text-white/70 uppercase">
                           {stat.label}
                         </span>
@@ -1339,32 +1354,59 @@ export default function Home() {
           </div>
 
           {/* Filter Section */}
-          <div className="w-full max-w-5xl mb-12 flex flex-wrap justify-center gap-4">
-            <button
-              onClick={() => setFilter("ALL")}
-              className={`px-6 py-2 rounded-full text-[10px] font-black border transition-all 
+          <div className="relative w-full max-w-5xl mb-6">
+            {/* swipe hint (mobile only) */}
+            <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 z-10 md:hidden">
+              <div
+                className="px-2 py-1 rounded-full text-[8px] font-mono uppercase tracking-widest
+      bg-white/70 text-zinc-700 border border-black/10
+      dark:bg-black/40 dark:text-white/50 dark:border-white/10"
+              >
+                →
+              </div>
+            </div>
+
+            {/* fade overlay (mobile only) */}
+            <div
+              className="pointer-events-none absolute right-0 top-0 h-full w-16 z-10 md:hidden
+    bg-gradient-to-l from-white to-transparent dark:from-black"
+            />
+
+            <div
+              className="
+      w-full
+      flex gap-3 overflow-x-auto no-scrollbar
+      justify-start px-4
+      md:flex-wrap md:justify-center md:gap-4
+    "
+            >
+              {" "}
+              <button
+                onClick={() => setFilter("ALL")}
+                className={`px-6 py-2 rounded-full text-[10px] font-black border transition-all 
               ${
                 filter === "ALL"
                   ? "bg-zinc-950 text-white border-zinc-950 dark:bg-white dark:text-black dark:border-white"
                   : "border-black/10 text-black/40 dark:border-white/10 dark:text-white/40 hover:border-black/30 dark:hover:border-white/30"
               }`}
-            >
-              ALL STAMPS
-            </button>
-            {CATEGORIES.map((c) => (
-              <button
-                key={c}
-                onClick={() => setFilter(c)}
-                className={`px-6 py-2 rounded-full text-[10px] font-black border transition-all 
+              >
+                ALL STAMPS
+              </button>
+              {CATEGORIES.map((c) => (
+                <button
+                  key={c}
+                  onClick={() => setFilter(c)}
+                  className={`px-6 py-2 rounded-full text-[10px] font-black border transition-all 
                     ${
                       filter === c
                         ? "bg-teal-500 text-white dark:text-black border-teal-500"
                         : "border-black/10 text-black/40 dark:border-white/10 dark:text-white/40 hover:border-black/30 dark:hover:border-white/30"
                     }`}
-              >
-                {c}
-              </button>
-            ))}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Passport Grid */}
@@ -1425,6 +1467,49 @@ export default function Home() {
                     <span className="text-[9px] font-mono uppercase tracking-widest mr-2 text-zinc-600 dark:text-zinc-500">
                       Digital Identity / {stamps.length} Logs
                     </span>
+                    {/* NEW: Active filters indicator */}
+                    {hasAnyFilterActive && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {filter !== "ALL" && (
+                          <button
+                            type="button"
+                            onClick={() => setFilter("ALL")}
+                            className="px-2.5 py-1 rounded-full text-[8px] font-mono uppercase tracking-widest border
+          bg-teal-500/10 border-teal-500/30 text-teal-700
+          dark:bg-teal-500/10 dark:border-teal-500/30 dark:text-teal-300"
+                            title="Clear category filter"
+                          >
+                            Category: {filter} ✕
+                          </button>
+                        )}
+
+                        {searchQuery.trim().length > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setSearchQuery("")}
+                            className="px-2.5 py-1 rounded-full text-[8px] font-mono uppercase tracking-widest border
+          bg-purple-500/10 border-purple-500/30 text-purple-700
+          dark:bg-purple-500/10 dark:border-purple-500/30 dark:text-purple-300"
+                            title="Clear search"
+                          >
+                            Search: {searchQuery} ✕
+                          </button>
+                        )}
+
+                        {activeCityFiltersCount > 0 && (
+                          <button
+                            type="button"
+                            onClick={() => setActiveCityFilters({})}
+                            className="px-2.5 py-1 rounded-full text-[8px] font-mono uppercase tracking-widest border
+          bg-zinc-500/10 border-black/10 text-zinc-700
+          dark:bg-white/5 dark:border-white/10 dark:text-white/60"
+                            title="Clear city filters"
+                          >
+                            City filter: {activeCityFiltersCount} ✕
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
 
                   {/* Mobile Issue Button */}
@@ -1546,9 +1631,19 @@ export default function Home() {
                   </button>
 
                   {/* Hidden Card */}
+                  {/* Hidden Card (export only) */}
                   <div
-                    className="fixed top-0 left-0 opacity-0 pointer-events-none -z-10"
                     aria-hidden="true"
+                    style={{
+                      position: "fixed",
+                      left: "-10000px",
+                      top: 0,
+                      width: "1px",
+                      height: "1px",
+                      overflow: "hidden",
+                      pointerEvents: "none",
+                      opacity: 0,
+                    }}
                   >
                     <div id="passport-share-card">
                       <PassportShareCard
@@ -1584,17 +1679,18 @@ export default function Home() {
                       <div className="flex flex-col mb-6 md:mb-10 px-4 md:px-8">
                         <div className="flex justify-between items-end w-full">
                           {/* 1. Country Header with integrated Stamp Counter */}
-                          <div className="flex justify-between items-end w-full border-b border-purple-200/20 dark:border-white/5 pb-6">
+                          <div className="flex flex-col md:flex-row md:justify-between md:items-end w-full border-b border-purple-200/20 dark:border-white/5 pb-4 md:pb-6 gap-3 md:gap-0">
                             <div className="flex flex-col">
-                              <h2 className="text-4xl font-black italic uppercase text-purple-600/30 dark:text-white/10 tracking-tighter leading-none">
+                              <h2 className="text-lg sm:text-xl md:text-4xl font-black italic uppercase text-purple-600/30 dark:text-white/10 tracking-tighter leading-tight md:leading-none">
                                 {country}
                               </h2>
-                              <div className="flex items-center gap-3 mt-2">
-                                <p className="text-[10px] font-mono text-teal-500 tracking-[0.3em] uppercase">
+
+                              <div className="flex items-center gap-3 mt-1 md:mt-2">
+                                <p className="text-[9px] md:text-[10px] font-mono text-teal-500 tracking-[0.3em] uppercase">
                                   Territory Registered
                                 </p>
-                                <span className="w-1 h-1 rounded-full bg-teal-500/40"></span>
-                                <p className="text-[10px] font-mono text-purple-500 dark:text-teal-400 font-bold tracking-widest">
+                                <span className="w-1 h-1 rounded-full bg-teal-500/40" />
+                                <p className="text-[9px] md:text-[10px] font-mono text-purple-500 dark:text-teal-400 font-bold tracking-widest">
                                   {filteredItems.length
                                     .toString()
                                     .padStart(2, "0")}{" "}
@@ -1603,7 +1699,7 @@ export default function Home() {
                               </div>
                             </div>
 
-                            <div className="flex gap-4 mb-1">
+                            <div className="flex gap-2 self-end md:gap-4 mt-1">
                               <button
                                 onClick={() =>
                                   scrollRefs.current[country]?.scrollBy({
@@ -1611,11 +1707,11 @@ export default function Home() {
                                     behavior: "smooth",
                                   })
                                 }
-                                className="p-3 rounded-full border border-purple-200 dark:border-white/10 hover:border-purple-500 dark:hover:border-teal-500 text-purple-300 dark:text-white/30 transition-all active:scale-90"
+                                className="p-2 md:p-3 rounded-full border border-purple-200 dark:border-white/10 hover:border-purple-500 dark:hover:border-teal-500 text-purple-300 dark:text-white/30 transition-all active:scale-90"
                               >
                                 <svg
-                                  width="20"
-                                  height="20"
+                                  width="18"
+                                  height="18"
                                   viewBox="0 0 24 24"
                                   fill="none"
                                   stroke="currentColor"
@@ -1624,6 +1720,7 @@ export default function Home() {
                                   <path d="M15 18l-6-6 6-6" />
                                 </svg>
                               </button>
+
                               <button
                                 onClick={() =>
                                   scrollRefs.current[country]?.scrollBy({
@@ -1631,11 +1728,11 @@ export default function Home() {
                                     behavior: "smooth",
                                   })
                                 }
-                                className="p-3 rounded-full border border-purple-200 dark:border-white/10 hover:border-purple-500 dark:hover:border-teal-500 text-purple-300 dark:text-white/30 transition-all active:scale-90"
+                                className="p-2 md:p-3 rounded-full border border-purple-200 dark:border-white/10 hover:border-purple-500 dark:hover:border-teal-500 text-purple-300 dark:text-white/30 transition-all active:scale-90"
                               >
                                 <svg
-                                  width="20"
-                                  height="20"
+                                  width="18"
+                                  height="18"
                                   viewBox="0 0 24 24"
                                   fill="none"
                                   stroke="currentColor"
@@ -1749,11 +1846,11 @@ export default function Home() {
                                 <div className="absolute inset-0 bg-black/20 dark:bg-transparent group-hover/stamp:bg-black/10 transition-colors" />
                               </div>
 
-                              <div className="relative z-10 text-center px-4 md:px-6">
-                                <p className="text-sm md:text-xl font-black uppercase italic text-white drop-shadow-md leading-tight">
+                              <div className="relative z-10 text-center px-3 md:px-6">
+                                <p className="text-[11px] sm:text-sm md:text-xl font-black uppercase italic text-white drop-shadow-md leading-tight">
                                   {s.venue}
                                 </p>
-                                <p className="text-[8px] md:text-[10px] font-mono text-white/60">
+                                <p className="text-[7px] sm:text-[8px] md:text-[10px] font-mono text-white/60">
                                   {s.city}
                                 </p>
                               </div>
@@ -2258,23 +2355,29 @@ export default function Home() {
                 <button
                   onClick={() => {
                     setView("map");
-                    // This scrolls the window down so the map is centered
                     setTimeout(() => {
                       window.scrollTo({ top: 600, behavior: "smooth" });
                     }, 100);
                   }}
-                  className={`text-[10px] font-black tracking-widest transition-all ${view === "map" ? "text-teal-400 scale-110" : "text-gray-500 hover:text-white"}`}
+                  className={`relative text-[10px] font-black tracking-widest transition-all ${
+                    view === "map"
+                      ? "text-teal-400 scale-110"
+                      : "text-gray-500 hover:text-white"
+                  }`}
                 >
                   GLOBAL MAP
+                  {/* NEW: active filter indicator */}
+                  {hasAnyFilterActive && (
+                    <span className="absolute -top-2 -right-3 px-2 py-0.5 rounded-full text-[7px] font-mono uppercase tracking-widest bg-teal-500 text-black">
+                      FILTERED
+                    </span>
+                  )}
                 </button>
               </nav>
             )}
         </div>
       </main>
       {view !== "map" && <ScrollToTop />}
-      <div style={{ position: "absolute", left: "-9999px", top: "0" }}>
-        <PassportShareCard stamps={stamps} intelligenceReport={intelReport} />
-      </div>
       {/* 3. WEB ONLY PREVIEW MODAL (Moved outside the button) */}
       {webPreview && (
         <div
