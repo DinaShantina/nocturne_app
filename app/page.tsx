@@ -36,6 +36,7 @@ import PassportShareCard from "./components/PassportShareCardProps";
 import { CountrySelect } from "react-country-state-city";
 import "react-country-state-city/dist/react-country-state-city.css";
 import { GetCountries } from "react-country-state-city";
+import { generateVanguardReport } from "@/lib/gemini";
 const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
   ssr: false,
   loading: () => (
@@ -226,21 +227,21 @@ export default function Home() {
       document.body.style.overflow = "unset";
     }
   }, [webPreview, galleryIndex]);
-  // useEffect(() => {
-  //   if (stamps.length === 0) {
-  //     setIntelReport("");
-  //     return;
-  //   }
-  //   if (stamps.length > 0) {
-  //     const minimalStamps = stamps.map((s) => ({
-  //       venue: s.venue,
-  //       city: s.city,
-  //       date: s.date,
-  //     }));
+  useEffect(() => {
+    if (stamps.length === 0) {
+      setIntelReport("");
+      return;
+    }
+    if (stamps.length > 0) {
+      const minimalStamps = stamps.map((s) => ({
+        venue: s.venue,
+        city: s.city,
+        date: s.date,
+      }));
 
-  //     generateVanguardReport(minimalStamps).then(setIntelReport);
-  //   }
-  // }, [stamps]);
+      generateVanguardReport(minimalStamps).then(setIntelReport);
+    }
+  }, [stamps]);
 
   React.useEffect(() => {
     if (stamps.length === 0) {
@@ -1594,7 +1595,6 @@ export default function Home() {
                       )}
                     </div>
                   )}
-
                   {/* Desktop Issue Button */}
                   <button
                     onClick={() => setShowForm(true)}
@@ -1606,7 +1606,6 @@ export default function Home() {
                       + ISSUE NEW STAMP
                     </span>
                   </button>
-
                   {/* Export Button */}
                   <button
                     onClick={onExportClick}
@@ -1629,21 +1628,16 @@ export default function Home() {
                       <line x1="12" y1="2" x2="12" y2="15" />
                     </svg>
                   </button>
-
                   {/* Hidden Card */}
-                  {/* Hidden Card (export only) */}
+
                   <div
-                    aria-hidden="true"
                     style={{
                       position: "fixed",
-                      left: "-10000px",
+                      left: 0,
                       top: 0,
-                      width: "1px",
-                      height: "1px",
-                      overflow: "hidden",
-                      pointerEvents: "none",
-                      opacity: 0,
+                      transform: "translateX(-200vw)",
                     }}
+                    aria-hidden="true"
                   >
                     <div id="passport-share-card">
                       <PassportShareCard
