@@ -233,10 +233,16 @@ export default function Home() {
       return;
     }
     if (stamps.length > 0) {
+      // FIX: Added 'country' to the mapping so it matches the Stamp interface
       const minimalStamps = stamps.map((s) => ({
+        id: s.id, // Add ID just in case
         venue: s.venue,
         city: s.city,
+        country: s.country, // <--- This was missing!
         date: s.date,
+        activity: s.activity || "",
+        color: s.color || "",
+        points: s.points || 0,
       }));
 
       generateVanguardReport(minimalStamps).then(setIntelReport);
