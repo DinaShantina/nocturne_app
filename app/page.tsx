@@ -1990,7 +1990,12 @@ export default function Home() {
 
                               <div
                                 className="absolute inset-0 rounded-full border-2 md:border-4"
-                                style={{ borderColor: s.color }}
+                                style={{
+                                  borderColor:
+                                    GENRE_COLORS[
+                                      (s.category || "OTHER").toUpperCase()
+                                    ] || "#a1a1aa",
+                                }}
                               ></div>
                               <div className="absolute inset-1 rounded-full overflow-hidden z-0 bg-zinc-500 dark:bg-zinc-950">
                                 {s.image && (
