@@ -2036,7 +2036,7 @@ export default function Home() {
 
           {/* MODAL & LIGHTBOX */}
           {selectedStamp && (
-            <div className="fixed inset-0 z-99999 flex items-center justify-center p-4 bg-white/80 dark:bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
+            <div className="fixed inset-0 z-200 flex items-center justify-center p-4 bg-white/80 dark:bg-black/95 backdrop-blur-xl animate-in fade-in duration-300">
               <div className="w-full max-w-lg bg-zinc-900 border border-white/10 rounded-[40px] overflow-hidden shadow-2xl relative">
                 <button
                   onClick={() => {
