@@ -1191,7 +1191,7 @@ export default function Home() {
                 </div>
               </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-white/5">
+            {/* <div className="mt-4 pt-4 border-t border-white/5">
               <button
                 onClick={cleanExistingData}
                 className="w-full py-1.5 border border-red-500/20 text-red-500/40 text-[7px] font-mono rounded hover:bg-red-500/5 transition-colors uppercase tracking-[0.2em]"
@@ -1201,6 +1201,21 @@ export default function Home() {
               <p className="text-[6px] font-mono text-red-500/30 uppercase italic mt-1 text-center">
                 * ADMIN OVERRIDE ONLY
               </p>
+            </div> */}
+            <div className="mt-auto pt-8 pb-4 opacity-40 group-hover:opacity-100 transition-opacity">
+              <div className="border-t border-zinc-800 pt-4 flex flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-widest">
+                    System Status: Prototype / Sandbox_Mode
+                  </span>
+                </div>
+                <p className="text-[8px] font-mono text-zinc-600 leading-tight">
+                  Data persisted via Firebase (Free Tier). Backend migration to
+                  dedicated Node.js / PostgreSQL architecture planned for Phase
+                  2.
+                </p>
+              </div>
             </div>
           </div>
         </div>
