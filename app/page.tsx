@@ -543,6 +543,10 @@ export default function Home() {
         venue: rawVenue.toUpperCase(),
         city: rawCity.toUpperCase(),
         country: finalCountry, // Defined earlier in your function
+        image: imageUrl, // Changed from imageUrl to image to match Edit logic
+        activity: (formData.get("activity") as string) || "", // Added missing field
+        category: (formData.get("category") as string) || "", // Added missing field
+        date: createDate, // Added to ensure the selected date is saved
         imageUrl: imageUrl, // Defined earlier in your function
         lat: lat, // Defined earlier in your function
         lng: lng, // Defined earlier in your function
