@@ -82,10 +82,32 @@ const NocturneCalendar = ({
 
   return (
     <div className="relative w-full group" onClick={handleContainerClick}>
-      <div className="bg-white border border-black/10 text-black dark:bg-black/60 dark:border-white/10 dark:text-white rounded-xl px-4 py-3 text-xs font-mono cursor-pointer flex justify-between items-center group-hover:border-teal-500 transition-colors">
-        <span className={value ? "text-white" : "text-gray-500"}>
+      <div
+        className="
+      bg-white
+      border border-black/10
+      text-black
+
+      dark:bg-black/60
+      dark:border-white/10
+      dark:text-white
+
+      rounded-xl px-4 py-3 text-xs font-mono
+      cursor-pointer flex justify-between items-center
+      group-hover:border-teal-500
+      transition-colors
+    "
+      >
+        <span
+          className={
+            value
+              ? "text-black dark:text-white" // ✅ FIXED
+              : "text-gray-500 dark:text-white/40"
+          }
+        >
           {value ? value.replace(/-/g, ".") : "SELECT DATE"}
         </span>
+
         <svg
           width="14"
           height="14"
@@ -95,12 +117,13 @@ const NocturneCalendar = ({
           className="text-teal-500"
           strokeWidth="2"
         >
-          <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-          <line x1="16" y1="2" x2="16" y2="6"></line>
-          <line x1="8" y1="2" x2="8" y2="6"></line>
-          <line x1="3" y1="10" x2="21" y2="10"></line>
+          <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+          <line x1="16" y1="2" x2="16" y2="6" />
+          <line x1="8" y1="2" x2="8" y2="6" />
+          <line x1="3" y1="10" x2="21" y2="10" />
         </svg>
       </div>
+
       <input
         ref={inputRef}
         type="date"
@@ -950,7 +973,7 @@ export default function Home() {
             >
               <div className="flex flex-col items-start">
                 <div className="flex items-center gap-2 relative">
-                  <h2 className="text-2xl font-black italic tracking-tighter text-white uppercase leading-none">
+                  <h2 className="text-2xl font-black italic tracking-tighter text-purple-950 dark:text-white uppercase leading-none">
                     SECURE_VAULT
                   </h2>
 
@@ -974,18 +997,19 @@ export default function Home() {
                     </div>
 
                     {/* THE FIXED POPUP */}
-                    <div className="fixed left-5 top-12.5 w-64 p-3 bg-zinc-950 border border-zinc-800 rounded shadow-[0_0_40px_rgba(0,0,0,0.9)] opacity-0 invisible group-hover:opacity-100 group-hover:visible pointer-events-none transition-all duration-200 z-[9999]">
-                      <h3 className="text-[9px] font-mono text-cyan-500 uppercase tracking-[0.3em] mb-2 border-b border-zinc-800 pb-1">
+                    <div className="fixed left-5 top-12.5 w-64 p-3 bg-white dark:bg-zinc-950 border border-purple-200 dark:border-zinc-800 rounded shadow-[0_0_25px_rgba(0,0,0,0.15)] dark:shadow-[0_0_40px_rgba(0,0,0,0.9)] opacity-0 invisible group-hover:opacity-100 group-hover:visible pointer-events-none transition-all duration-200 z-[9999]">
+                      <h3 className="text-[9px] font-mono text-purple-800 dark:text-cyan-500 uppercase tracking-[0.3em] mb-2 border-b border-purple-200 dark:border-zinc-800 pb-1">
                         ARHIVE MANIFESTO
                       </h3>
-                      <p className="text-[12px] text-zinc-400 font-light leading-relaxed">
-                        The{" "}
-                        <span className="text-zinc-200 font-bold italic">
+
+                      <p className="text-[12px] text-zinc-600 dark:text-zinc-400 font-light leading-relaxed">
+                        The
+                        <span className="text-purple-950 dark:text-zinc-200 font-bold italic">
                           VAULT
-                        </span>{" "}
+                        </span>
                         is your personal encrypted archive. Every 5 deployments,
                         the system synthesizes a{" "}
-                        <span className="text-zinc-200 font-bold uppercase">
+                        <span className="text-purple-950 dark:text-zinc-200 font-bold uppercase">
                           Cultural DNA Fragment
                         </span>
                         .
@@ -1014,7 +1038,12 @@ export default function Home() {
               </svg>
             </button>
 
-            {isVaultOpen && <Vault stamps={stamps} artifacts={artifacts} />}
+            {isVaultOpen && (
+              <div className=" mt-4 rounded-2xl bg-black/90  border border-white/10 shadow-inner p-4">
+                <Vault stamps={stamps} artifacts={artifacts} />
+              </div>
+            )}
+
             {/* Primary Stat */}
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 group relative">
