@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
+import { useEffect, useState } from "react";
 
 const THEME_STORAGE_KEY = "nocturne-theme";
 
@@ -15,14 +15,13 @@ const readSavedTheme = (): Theme | null => {
 };
 
 export default function ThemeToggle() {
-  // NEW/UPDATED: derive initial state without an effect (avoids cascading render warning)
   const [isDark, setIsDark] = useState<boolean | null>(() => {
     const saved = readSavedTheme();
     if (saved === "dark") return true;
     if (saved === "light") return false;
 
-    // first visit default
-    return false;
+    // NEW/UPDATED: first visit default (dark)
+    return true;
   });
 
   // NEW/UPDATED: effect only syncs external systems (DOM + localStorage)
