@@ -2,41 +2,41 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
-import React, { useEffect, useState, useMemo, useRef } from "react";
-import { submitEvent } from "./actions";
 import dynamic from "next/dynamic";
 import Image from "next/image";
+import React, { useEffect, useMemo, useRef, useState } from "react";
+import { submitEvent } from "./actions";
 import ScrollToTop from "./components/ScrollToTop";
 import { calculateTotalTravel } from "./utils/geoUtils";
 // Firebase Imports
+import { CATEGORIES, GENRE_COLORS } from "@/lib/constants";
 import { db, storage } from "@/lib/firebase";
+import { generateUniqueArtifact, generateVanguardReport } from "@/lib/gemini";
 import {
-  collection,
-  addDoc,
-  onSnapshot,
-  query,
-  orderBy,
-  doc,
-  deleteDoc,
-  updateDoc,
-  serverTimestamp,
-  getDocs,
-} from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import imageCompression from "browser-image-compression";
-import {
-  normalizeCountryName,
+  downloadWebPassport,
   getRank,
   getRankData,
   handleSharePassport,
-  downloadWebPassport,
+  normalizeCountryName,
 } from "@/lib/utils";
-import { CATEGORIES, GENRE_COLORS } from "@/lib/constants";
-import PassportShareCard from "./components/PassportShareCardProps";
-import { CountrySelect } from "react-country-state-city";
+import imageCompression from "browser-image-compression";
+import {
+  addDoc,
+  collection,
+  deleteDoc,
+  doc,
+  getDocs,
+  onSnapshot,
+  orderBy,
+  query,
+  serverTimestamp,
+  updateDoc,
+} from "firebase/firestore";
+import { getDownloadURL, ref, uploadBytes } from "firebase/storage";
+import { CountrySelect, GetCountries } from "react-country-state-city";
 import "react-country-state-city/dist/react-country-state-city.css";
-import { GetCountries } from "react-country-state-city";
-import { generateVanguardReport } from "@/lib/gemini";
+import PassportShareCard from "./components/PassportShareCardProps";
+import Vault from "./components/Vault";
 const NocturneMap = dynamic(() => import("./components/NocturneMap"), {
   ssr: false,
   loading: () => (
@@ -190,7 +190,8 @@ export default function Home() {
   const [webPreview, setWebPreview] = useState<string | null>(null);
   const stickySentinelRef = useRef<HTMLDivElement | null>(null);
   const [isHeaderStuck, setIsHeaderStuck] = useState(false);
-
+  const [artifacts, setArtifacts] = useState<any[]>([]);
+  const [isVaultOpen, setIsVaultOpen] = useState(false);
   useEffect(() => {
     if (!stickySentinelRef.current) return;
 
@@ -227,6 +228,7 @@ export default function Home() {
       document.body.style.overflow = "unset";
     }
   }, [webPreview, galleryIndex]);
+
   useEffect(() => {
     if (stamps.length === 0) {
       setIntelReport("");
@@ -375,28 +377,49 @@ export default function Home() {
 
   useEffect(() => {
     setMounted(true);
-    const q = query(collection(db, "stamps"), orderBy("createdAt", "desc"));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+
+    // 1. STAMPS LISTENER (Your existing code)
+    const qStamps = query(
+      collection(db, "stamps"),
+      orderBy("createdAt", "desc"),
+    );
+    const unsubStamps = onSnapshot(qStamps, (snapshot) => {
       const list = snapshot.docs.map((doc) => {
         const data = doc.data();
-
-        // FIX: If 'date' is missing in Firestore, convert 'createdAt' to a string
         let finalDate = data.date;
         if (!finalDate && data.createdAt) {
           finalDate = new Date(data.createdAt.seconds * 1000)
             .toISOString()
             .split("T")[0];
         }
-
         return {
           id: doc.id,
           ...data,
-          date: finalDate || new Date().toISOString().split("T")[0], // Last resort fallback
+          date: finalDate || new Date().toISOString().split("T")[0],
         };
       }) as Stamp[];
       setStamps(list);
     });
-    return () => unsubscribe();
+
+    // 2. ARTIFACTS LISTENER (The fix for the error)
+    const qArtifacts = query(
+      collection(db, "artifacts"),
+      orderBy("timestamp", "desc"),
+    );
+    const unsubArtifacts = onSnapshot(qArtifacts, (snapshot) => {
+      console.log("Vault Scan:", snapshot.size, "artifacts found");
+      const artList = snapshot.docs.map((doc) => ({
+        id: doc.id,
+        ...doc.data(),
+      }));
+      setArtifacts(artList); // This populates the 'artifacts' variable
+    });
+
+    // CLEANUP: Stop both listeners when the component unmounts
+    return () => {
+      unsubStamps();
+      unsubArtifacts();
+    };
   }, []);
 
   useEffect(() => {
@@ -425,16 +448,16 @@ export default function Home() {
     const formElement = e.currentTarget;
     const formData = new FormData(formElement);
     setStatus("STAMPING...");
+    const rawVenue = (formData.get("venue") as string) || "UNKNOWN LOC";
+    const rawCity = (formData.get("city") as string) || "RECON ZONE";
+    const rawCountry = (formData.get("country") as string) || "";
+    const finalCountry = normalizeCountryName(rawCountry).toUpperCase();
 
     // 1. Prepare variables
     let imageUrl = "";
     let lat = 0;
     let lng = 0;
     const file = formData.get("image") as File;
-
-    const rawCountry = (formData.get("country") as string) || "";
-    const finalCountry = normalizeCountryName(rawCountry).toUpperCase();
-    const rawCity = ((formData.get("city") as string) || "").toUpperCase();
 
     try {
       // 2. Upload Image (With Safety Catch)
@@ -490,24 +513,52 @@ export default function Home() {
         }
       }
 
-      // 4. Save to Firestore
-      const docRef = await addDoc(collection(db, "stamps"), {
-        city: rawCity,
-        country: finalCountry,
-        venue: ((formData.get("venue") as string) || "").toUpperCase(),
-        activity: (formData.get("activity") as string) || "",
-        category: (formData.get("category") as string) || "",
-        date: createDate,
-        image: imageUrl,
-        lat: lat,
-        lng: lng,
-        color: ["#22d3ee", "#818cf8", "#f472b6", "#fbbf24", "#34d399"][
-          Math.floor(Math.random() * 5)
-        ],
-        points: Math.floor(Math.random() * 41) + 10,
-        createdAt: serverTimestamp(),
-      });
+      // 4. SAVE TO FIRESTORE
+      setStatus("ARCHIVING DEPLOYMENT...");
 
+      const stampData = {
+        venue: rawVenue.toUpperCase(),
+        city: rawCity.toUpperCase(),
+        country: finalCountry, // Defined earlier in your function
+        imageUrl: imageUrl, // Defined earlier in your function
+        lat: lat, // Defined earlier in your function
+        lng: lng, // Defined earlier in your function
+        createdAt: serverTimestamp(),
+      };
+
+      const docRef = await addDoc(collection(db, "stamps"), stampData);
+
+      // 🚀 THE BADGE TRIGGER: Check total count directly from DB for accuracy
+      const stampSnapshot = await getDocs(collection(db, "stamps"));
+      const totalStamps = stampSnapshot.size;
+
+      // Trigger every 5th stamp
+      if (totalStamps > 0 && totalStamps % 5 === 0) {
+        const currentRank = totalStamps / 5;
+        setStatus(`SYNTHESIZING RANK ${currentRank} ARTIFACT...`);
+
+        try {
+          // Use the rawCity as the theme for the AI prompt
+          const svgCode = await generateUniqueArtifact(rawCity, currentRank);
+
+          if (svgCode) {
+            await addDoc(collection(db, "artifacts"), {
+              svg: svgCode,
+              title: `RANK_${currentRank}_SEAL`,
+              level: currentRank,
+              stampId: docRef.id,
+              timestamp: serverTimestamp(),
+            });
+            console.log(
+              `✅ Rank ${currentRank} Artifact secured in the Vault.`,
+            );
+          }
+        } catch (aiErr) {
+          console.error("Vault Synthesis Failed:", aiErr);
+        }
+      } else {
+        setStatus("STAMP ARCHIVED.");
+      }
       // 5. Reset & Success
       formElement.reset();
       setImageUploaded(false);
@@ -789,7 +840,6 @@ export default function Home() {
 
   return (
     <div className="flex min-h-screen bg-white dark:bg-zinc-950 pb-32 px-4 md:px-0">
-      {" "}
       {/* SLIDE-OUT SIDEBAR */}
       {/* The Backdrop/Overlay - Only visible on mobile when sidebar is open */}
       {showSidebar && (
@@ -889,6 +939,82 @@ export default function Home() {
 
           {/* STATS GRID */}
           <div className="space-y-6 mt-4">
+            {/* <div className="border-t border-purple-300/20 dark:border-white/5 pt-4 mt-2"> */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsVaultOpen(!isVaultOpen);
+              }}
+              /* REMOVED 'group' FROM HERE */
+              className="flex items-center justify-between w-full py-2"
+            >
+              <div className="flex flex-col items-start">
+                <div className="flex items-center gap-2 relative">
+                  <h2 className="text-2xl font-black italic tracking-tighter text-white uppercase leading-none">
+                    SECURE_VAULT
+                  </h2>
+
+                  {/* INFO ICON CONTAINER - The 'group' stays ONLY here */}
+                  <div className="group relative">
+                    <div className="cursor-help text-zinc-600 hover:text-cyan-400 transition-colors py-1">
+                      <svg
+                        width="10"
+                        height="10"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <circle cx="12" cy="12" r="10" />
+                        <line x1="12" y1="16" x2="12" y2="12" />
+                        <line x1="12" y1="8" x2="12.01" y2="8" />
+                      </svg>
+                    </div>
+
+                    {/* THE FIXED POPUP */}
+                    <div className="fixed left-5 top-12.5 w-64 p-3 bg-zinc-950 border border-zinc-800 rounded shadow-[0_0_40px_rgba(0,0,0,0.9)] opacity-0 invisible group-hover:opacity-100 group-hover:visible pointer-events-none transition-all duration-200 z-[9999]">
+                      <h3 className="text-[9px] font-mono text-cyan-500 uppercase tracking-[0.3em] mb-2 border-b border-zinc-800 pb-1">
+                        ARHIVE MANIFESTO
+                      </h3>
+                      <p className="text-[12px] text-zinc-400 font-light leading-relaxed">
+                        The{" "}
+                        <span className="text-zinc-200 font-bold italic">
+                          VAULT
+                        </span>{" "}
+                        is your personal encrypted archive. Every 5 deployments,
+                        the system synthesizes a{" "}
+                        <span className="text-zinc-200 font-bold uppercase">
+                          Cultural DNA Fragment
+                        </span>
+                        .
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-[10px] font-mono text-zinc-500 uppercase tracking-widest mt-1">
+                  {artifacts.length} Objects Recovered
+                </p>
+              </div>
+
+              {/* CHEVRON ICON */}
+              <svg
+                width="12"
+                height="12"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="3"
+                /* We can still use a conditional rotate based on state, but 'group' won't affect it anymore */
+                className={`text-zinc-500 transition-transform duration-300 ${isVaultOpen ? "rotate-180" : ""}`}
+              >
+                <path d="M6 9l6 6 6-6" />
+              </svg>
+            </button>
+
+            {isVaultOpen && <Vault stamps={stamps} artifacts={artifacts} />}
             {/* Primary Stat */}
             <div className="space-y-1">
               <div className="flex items-center gap-1.5 group relative">
@@ -916,7 +1042,7 @@ export default function Home() {
 
                 {/* Tooltip Badge */}
                 <div className="absolute bottom-full left-0 mb-2 w-48 p-2 bg-white dark:bg-zinc-950 border border-purple-100 dark:border-white/10 rounded-lg shadow-xl opacity-0 group-hover:opacity-100 pointer-events-none transition-all duration-200 z-50 transform translate-y-1 group-hover:translate-y-0">
-                  <p className="text-[9px] leading-tight text-purple-900 dark:text-zinc-400 font-mono italic">
+                  <p className="text-[12px] text-zinc-400 font-light leading-relaxed">
                     The cumulative distance between all your stamps, calculated
                     via GPS coordinates for your entire journey.
                   </p>
@@ -1296,8 +1422,7 @@ export default function Home() {
                       name="venue"
                       placeholder="VENUE"
                       required
-                      className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-all
-                  bg-white border-purple-200 text-purple-900 placeholder:text-purple-300
+                      className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border transition-allbg-white border-purple-200 text-purple-900 placeholder:text-purple-300
                   dark:bg-black/60 dark:border-white/10 dark:text-white dark:placeholder:text-white dark:focus:border-teal-500"
                     />
 
@@ -1364,11 +1489,7 @@ export default function Home() {
           <div className="relative w-full max-w-5xl mb-6">
             {/* swipe hint (mobile only) */}
             <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 z-10 md:hidden">
-              <div
-                className="px-2 py-1 rounded-full text-[8px] font-mono uppercase tracking-widest
-      bg-white/70 text-zinc-700 border border-black/10
-      dark:bg-black/40 dark:text-white/50 dark:border-white/10"
-              >
+              <div className="px-2 py-1 rounded-full text-[8px] font-mono uppercase tracking-widest bg-white/70 text-zinc-700 border border-black/10 dark:bg-black/40 dark:text-white/50 dark:border-white/10">
                 →
               </div>
             </div>
@@ -1379,14 +1500,7 @@ export default function Home() {
     bg-gradient-to-l from-white to-transparent dark:from-black"
             />
 
-            <div
-              className="
-      w-full
-      flex gap-3 overflow-x-auto no-scrollbar
-      justify-start px-4
-      md:flex-wrap md:justify-center md:gap-4
-    "
-            >
+            <div className="w-full flex gap-3 overflow-x-auto no-scrollbar justify-start px-4 md:flex-wrap md:justify-center md:gap-4">
               {" "}
               <button
                 onClick={() => setFilter("ALL")}
@@ -1579,11 +1693,7 @@ export default function Home() {
                       ) : (
                         <button
                           onClick={() => setIsSearchOpen(true)}
-                          className="
-                p-2 rounded-full transition-all
-                hover:bg-black/5 border border-transparent hover:border-black/10
-                dark:hover:bg-white/5 dark:hover:border-white/10
-              "
+                          className="p-2 rounded-full transition-allhover:bg-black/5 border border-transparent hover:border-black/10 dark:hover:bg-white/5 dark:hover:border-white/10"
                         >
                           <svg
                             width="18"
