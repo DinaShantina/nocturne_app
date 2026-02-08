@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 
 const THEME_STORAGE_KEY = "nocturne-theme";
 
-type Theme = "light" | "dark";
+type Theme = "dark" | "light";
 
 const readSavedTheme = (): Theme | null => {
   if (typeof window === "undefined") return null;
