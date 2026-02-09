@@ -2198,15 +2198,15 @@ export default function Home() {
                     ref={editFormRef}
                     onSubmit={handleUpdate}
                     className="w-full max-w-4xl mx-auto relative z-10 
-             p-5 md:p-10 
-             rounded-[2.5rem] 
-             shadow-2xl backdrop-blur-xl transition-all duration-500 
-             bg-white/90 border border-black/10 
-             dark:bg-zinc-900/90 dark:border-white/10
-             /* SCROLL LOGIC */
-             max-h-[85vh] overflow-y-auto 
-             flex flex-col gap-3 md:gap-6
-             scrollbar-thin scrollbar-thumb-teal-500/20"
+                      p-5 md:p-10 
+                      rounded-[2.5rem] 
+                      shadow-2xl backdrop-blur-xl transition-all duration-500 
+                      bg-white/90 border border-black/10 
+                      dark:bg-zinc-900/90 dark:border-white/10
+                      /* SCROLL LOGIC */
+                      max-h-[85vh] overflow-y-auto 
+                      flex flex-col gap-3 md:gap-6
+                      scrollbar-thin scrollbar-thumb-teal-500/20"
                   >
                     {/* Header - Sticky so you always know what you're editing */}
                     <div className="text-center md:text-left shrink-0 pb-2">
@@ -2358,7 +2358,7 @@ export default function Home() {
 
           {/* FULLSCREEN GALLERY LIGHTBOX */}
           {galleryIndex !== null && (
-            <div className="fixed inset-0 z-300 bg-white/90 dark:bg-black/98 backdrop-blur-2xl flex items-center justify-center animate-in fade-in duration-300">
+            <div className="fixed inset-0 z-[11000] bg-white/90 dark:bg-black/98 backdrop-blur-2xl flex items-center justify-center animate-in fade-in duration-300">
               {/* Navigation HUD */}
               <button
                 onClick={() => setGalleryIndex(null)}
