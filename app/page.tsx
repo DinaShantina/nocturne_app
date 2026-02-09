@@ -2197,42 +2197,49 @@ export default function Home() {
                   <form
                     ref={editFormRef}
                     onSubmit={handleUpdate}
-                    /* Changed max-w-md to max-w-4xl for laptop breathability */
-                    className=" w-full max-w-4xl space-y-4 mx-auto relative z-10 p-4 md:p-10  rounded-3xl md:rounded-[2.5rem] shadow-2xl backdrop-blur-xl transition-all duration-500 bg-white/90 border border-black/10  dark:bg-zinc-900/90 dark:border-white/10"
+                    className="w-full max-w-4xl mx-auto relative z-10 
+             p-5 md:p-10 
+             rounded-[2.5rem] 
+             shadow-2xl backdrop-blur-xl transition-all duration-500 
+             bg-white/90 border border-black/10 
+             dark:bg-zinc-900/90 dark:border-white/10
+             /* SCROLL LOGIC */
+             max-h-[85vh] overflow-y-auto 
+             flex flex-col gap-3 md:gap-6
+             scrollbar-thin scrollbar-thumb-teal-500/20"
                   >
-                    {/* Header inside the form for better context */}
-                    <div className="text-center md:text-left mb-4">
-                      <h2 className="text-xl font-black uppercase tracking-widest text-teal-400 italic">
+                    {/* Header - Sticky so you always know what you're editing */}
+                    <div className="text-center md:text-left shrink-0 pb-2">
+                      <h2 className="text-[14px] md:text-xl font-black uppercase tracking-[0.2em] text-teal-400 italic">
                         Modify Log
                       </h2>
                     </div>
 
-                    {/* New Grid Wrapper: 1 Column on Mobile, 2 Columns on Laptop */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      {/* LEFT COLUMN: Map and Location Info */}
-                      <div className="space-y-4">
-                        <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
+                      {/* LEFT COLUMN */}
+                      <div className="space-y-3 md:space-y-4">
+                        <div className="grid grid-cols-2 gap-2">
                           <input
                             name="city"
                             defaultValue={selectedStamp.city}
                             placeholder="CITY"
                             required
-                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/40 dark:border-white/10 dark:text-white dark:placeholder:text-white/40 focus:border-teal-500"
+                            className="rounded-xl px-3 py-2.5 text-[10px] md:text-xs font-mono uppercase outline-none border bg-white border-black/10 dark:bg-black/40 dark:border-white/10 text-black dark:text-white focus:border-teal-500"
                           />
                           <input
                             name="country"
                             defaultValue={selectedStamp.country}
                             placeholder="COUNTRY"
                             required
-                            className="rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/40 dark:border-white/10 dark:text-white dark:placeholder:text-white/40 focus:border-teal-500"
+                            className="rounded-xl px-3 py-2.5 text-[10px] md:text-xs font-mono uppercase outline-none border bg-white border-black/10 dark:bg-black/40 dark:border-white/10 text-black dark:text-white focus:border-teal-500"
                           />
                         </div>
 
-                        <div className="flex flex-col gap-2">
-                          <label className="text-[10px] text-zinc-600 dark:text-zinc-500 font-mono uppercase">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="text-[9px] text-zinc-500 font-mono uppercase tracking-wider">
                             📍 Pin Location
                           </label>
-                          <div className="rounded-2xl overflow-hidden h-50 md:h-62.5">
+                          <div className="rounded-2xl overflow-hidden h-36 md:h-62.5 border border-black/5 dark:border-white/5">
                             <LocationPicker
                               initialPos={[
                                 selectedStamp?.lat || 0,
@@ -2246,22 +2253,21 @@ export default function Home() {
                         </div>
                       </div>
 
-                      {/* RIGHT COLUMN: Details and Actions */}
-                      <div className="space-y-4 flex flex-col justify-between">
+                      {/* RIGHT COLUMN */}
+                      <div className="space-y-3 md:space-y-4">
                         <input
                           name="venue"
                           defaultValue={selectedStamp.venue}
                           placeholder="VENUE"
                           required
-                          className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none border bg-black/40 border-white/10 text-white focus:border-teal-500"
+                          className="w-full rounded-xl px-3 py-2.5 text-[10px] md:text-xs font-mono uppercase outline-none border bg-black/40 border-white/10 text-white focus:border-teal-500"
                         />
 
-                        <div className="flex flex-col gap-4">
-                          {/* Changed from grid-cols-2 to flex-col */}
+                        <div className="grid grid-cols-1 gap-2">
                           <select
                             name="category"
                             defaultValue={selectedStamp.category}
-                            className="w-full rounded-xl px-4 py-3 text-xs font-mono uppercase outline-none transition-all border bg-white border-black/10 text-black dark:bg-black/40 dark:border-white/10 dark:text-white focus:border-teal-500"
+                            className="w-full rounded-xl px-3 py-2.5 text-[10px] md:text-xs font-mono uppercase outline-none border bg-white border-black/10 dark:bg-black/40 dark:border-white/10 text-black dark:text-white focus:border-teal-500"
                           >
                             <option value="">UNCATEGORIZED</option>
                             {CATEGORIES.map((c) => (
@@ -2279,12 +2285,11 @@ export default function Home() {
                         <textarea
                           name="activity"
                           defaultValue={selectedStamp.activity}
-                          rows={3}
+                          rows={2}
                           placeholder="ACTIVITY"
-                          className="w-full rounded-xl px-4 py-3 text-xs font-mono outline-none border resize-none bg-white border-black/10 text-black placeholder:text-zinc-400 dark:bg-black/40 dark:border-white/10 dark:text-white dark:placeholder:text-white/40 focus:border-teal-500"
+                          className="w-full rounded-xl px-3 py-2.5 text-[10px] md:text-xs font-mono outline-none border resize-none bg-white border-black/10 dark:bg-black/40 dark:border-white/10 text-black dark:text-white focus:border-teal-500"
                         />
 
-                        {/* File Upload remains similar but more compact */}
                         <div className="relative">
                           <input
                             type="file"
@@ -2296,30 +2301,30 @@ export default function Home() {
                             className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"
                           />
                           <div
-                            className={`w-full border border-dashed rounded-xl py-3 text-center text-[10px] font-mono flex items-center justify-center gap-2 uppercase transition-all ${
+                            className={`w-full border border-dashed rounded-xl py-2.5 text-center text-[9px] font-mono flex items-center justify-center gap-2 uppercase transition-all ${
                               editImageUploaded
-                                ? "border-teal-500 text-teal-600 dark:text-teal-500 bg-teal-500/5"
-                                : "border-black/10 text-zinc-600 bg-black/5 dark:border-white/10 dark:text-white/40 dark:bg-black/20"
+                                ? "border-teal-500 text-teal-500 bg-teal-500/5"
+                                : "border-black/10 text-zinc-500 bg-black/5 dark:border-white/10 dark:text-white/30"
                             }`}
                           >
                             {editImageUploaded
                               ? "✓ Evidence Ready"
-                              : "Change Image"}
+                              : "Change Evidence"}
                           </div>
                         </div>
                       </div>
                     </div>
 
-                    {/* FOOTER ACTIONS: Full width at the bottom */}
-                    <div className="flex gap-3 pt-4 border-t border-black/10 dark:border-white/5">
+                    {/* FOOTER ACTIONS - Fixed at bottom */}
+                    <div className="flex gap-2 pt-4 mt-2 border-t border-black/10 dark:border-white/5 shrink-0">
                       <button
                         type="button"
                         onClick={() => setShowDeleteConfirm(selectedStamp.id)}
-                        className="p-4 bg-red-500/10 text-red-500 rounded-2xl border border-red-500/20 hover:bg-red-500 hover:text-white transition-all"
+                        className="p-3 bg-red-500/10 text-red-500 rounded-xl border border-red-500/20 active:scale-95 transition-transform"
                       >
                         <svg
-                          width="20"
-                          height="20"
+                          width="16"
+                          height="16"
                           viewBox="0 0 24 24"
                           fill="none"
                           stroke="currentColor"
@@ -2330,9 +2335,9 @@ export default function Home() {
                       </button>
                       <button
                         type="submit"
-                        className="flex-1 py-4 text-[10px] font-black uppercase bg-teal-500 text-black rounded-2xl transition-all hover:bg-teal-400 shadow-[0_0_20px_rgba(45,212,191,0.2)]"
+                        className="flex-1 py-3 text-[10px] font-black uppercase bg-teal-500 text-black rounded-xl active:scale-95 transition-transform"
                       >
-                        Save Update
+                        Save
                       </button>
                       <button
                         type="button"
@@ -2340,7 +2345,7 @@ export default function Home() {
                           setIsEditing(false);
                           setSelectedStamp(null);
                         }}
-                        className="flex-1 py-4 text-[10px] font-black uppercase rounded-2xl transition-colors border border-black/10 text-zinc-700 hover:bg-black/5 dark:border-white/10 dark:text-white/60 dark:hover:bg-white/5"
+                        className="flex-1 py-3 text-[10px] font-black uppercase rounded-xl border border-black/10 text-zinc-500 dark:border-white/10 dark:text-white/40"
                       >
                         Cancel
                       </button>
