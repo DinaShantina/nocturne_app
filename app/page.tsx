@@ -877,7 +877,7 @@ export default function Home() {
       )}
       <aside
         className={`fixed left-0 top-0 h-full z-9999 transition-all duration-500 bg-white/90 dark:bg-zinc-950/95 backdrop-blur-xl md:bg-purple-100 md:dark:bg-zinc-950 border-r border-black/10 dark:border-white/10 md:border-purple-300/50
-    ${galleryIndex !== null ? "-translate-x-full" : ""} 
+      ${galleryIndex !== null ? "-translate-x-full pointer-events-none" : "pointer-events-auto"}
     ${
       showSidebar
         ? "w-80 translate-x-0"
